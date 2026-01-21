@@ -56,17 +56,17 @@ export function CalendarMonth({ monthKey, byDay, selectedDay, onSelectDay }: Cal
   const cells = buildCalendarCells(monthKey);
 
   return (
-    <Card className="p-4">
-      <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-muted-foreground">
+    <Card className="p-3 sm:p-4">
+      <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-semibold text-muted-foreground sm:gap-2 sm:text-xs">
         {weekdayLabels.map((label) => (
           <span key={label}>{label}</span>
         ))}
       </div>
-      <div className="mt-3 grid grid-cols-7 gap-2">
+      <div className="mt-2 grid grid-cols-7 gap-1.5 sm:mt-3 sm:gap-2">
         {cells.map((cell, index) => {
           if (!cell.dayKey) {
             return (
-              <div key={`empty-${index}`} className="h-24 rounded-lg" />
+              <div key={`empty-${index}`} className="h-16 rounded-lg sm:h-24" />
             );
           }
 
@@ -79,21 +79,36 @@ export function CalendarMonth({ monthKey, byDay, selectedDay, onSelectDay }: Cal
               key={cell.dayKey}
               onClick={() => onSelectDay(cell.dayKey!)}
               className={cn(
-                "flex h-24 flex-col justify-between rounded-lg border px-3 py-2 text-left text-xs transition",
+                "flex h-16 flex-col justify-between rounded-lg border px-2 py-1.5 text-left text-[10px] transition sm:h-24 sm:px-3 sm:py-2 sm:text-xs",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background",
                 hasActivity && !isSelected && "bg-emerald-50/60"
               )}
             >
-              <span className={cn("text-sm font-semibold", isSelected ? "text-primary-foreground" : "text-foreground")}>
+              <span
+                className={cn(
+                  "text-xs font-semibold sm:text-sm",
+                  isSelected ? "text-primary-foreground" : "text-foreground"
+                )}
+              >
                 {String(cell.label).padStart(2, "0")}
               </span>
               <div className="space-y-1">
-                <p className={cn("text-[11px]", isSelected ? "text-rose-100" : "text-rose-500")}>
+                <p
+                  className={cn(
+                    "text-[10px] sm:text-[11px]",
+                    isSelected ? "text-rose-100" : "text-rose-500"
+                  )}
+                >
                   Ra: {formatCurrency(totals.expense)}
                 </p>
-                <p className={cn("text-[11px]", isSelected ? "text-emerald-100" : "text-emerald-600")}>
+                <p
+                  className={cn(
+                    "text-[10px] sm:text-[11px]",
+                    isSelected ? "text-emerald-100" : "text-emerald-600"
+                  )}
+                >
                   Vào: {formatCurrency(totals.income)}
                 </p>
               </div>
