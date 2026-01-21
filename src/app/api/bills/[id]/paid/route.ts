@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { toggleBillPaid } from "@/lib/repo/billsRepo";
@@ -8,9 +8,10 @@ const bodySchema = z.object({
 });
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   const body = await request.json();
   const parse = bodySchema.safeParse(body);
 
@@ -19,7 +20,7 @@ export async function PATCH(
   }
 
   const paidAt = parse.data.paid ? new Date() : null;
-  const updated = await toggleBillPaid(params.id, parse.data.paid, paidAt);
+  const updated = await toggleBillPaid(id, parse.data.paid, paidAt);
 
   return NextResponse.json({ id: String(updated?._id) });
 }
