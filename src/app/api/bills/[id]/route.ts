@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { deleteBillById } from "@/lib/repo/billsRepo";
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const removed = await deleteBillById(params.id);
+  const { id } = await context.params;
+  const removed = await deleteBillById(id);
 
   if (!removed) {
     return NextResponse.json({ error: "Không tìm thấy khoản đóng." }, { status: 404 });

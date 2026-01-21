@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { transactionSchema } from "@/lib/domain/transactions";
 import { deleteTransactionById, updateTransactionById } from "@/lib/repo/transactionsRepo";
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   const body = await request.json();
   const parse = transactionSchema.safeParse(body);
 
@@ -15,7 +16,7 @@ export async function PATCH(
   }
 
   const payload = parse.data;
-  const updated = await updateTransactionById(params.id, {
+  const updated = await updateTransactionById(id, {
     ...payload,
     date: new Date(`${payload.date}T00:00:00`),
   });
@@ -28,10 +29,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const removed = await deleteTransactionById(params.id);
+  const { id } = await context.params;
+  const removed = await deleteTransactionById(id);
 
   if (!removed) {
     return NextResponse.json({ error: "Không tìm thấy giao dịch." }, { status: 404 });
