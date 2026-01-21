@@ -345,7 +345,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
             />
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
+            <Button variant="outline" onClick={handleDelete} disabled={saving}>
               Xoá
             </Button>
             <Button onClick={handleSave} disabled={saving}>
