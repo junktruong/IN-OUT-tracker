@@ -1,18 +1,6 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
+import { billSchema } from "@/lib/domain/bills";
 import { listBills, upsertBill } from "@/lib/repo/billsRepo";
-
-const bodySchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1),
-  amount: z.number().positive(),
-  dueDay: z.number().int().min(1).max(31),
-  group: z.string().optional(),
-  start: z.string().optional(),
-  end: z.string().optional(),
-  note: z.string().optional(),
-});
 
 export async function GET() {
   const items = await listBills();
@@ -27,13 +15,15 @@ export async function GET() {
     note: item.note,
     paid: item.paid,
     paidAt: item.paidAt ? item.paidAt.toISOString().slice(0, 10) : undefined,
+    paidAmount: item.paidAmount ?? undefined,
+    paidNote: item.paidNote ?? undefined,
   }));
   return NextResponse.json({ items: response });
 }
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const parse = bodySchema.safeParse(body);
+  const parse = billSchema.safeParse(body);
 
   if (!parse.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });

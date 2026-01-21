@@ -57,8 +57,38 @@ describe("billsRepo", () => {
     expect(reverted?.paid).toBe(false);
   });
 
+  it("confirms payment with details and can undo", async () => {
+    const created = await repo.upsertBill({
+      name: "Điện",
+      amount: 450000,
+      dueDay: 12,
+    });
+    const paid = await repo.payBill(
+      String(created?._id),
+      new Date("2024-05-10"),
+      430000,
+      "Đóng sớm"
+    );
+    expect(paid?.paid).toBe(true);
+    expect(paid?.paidAmount).toBe(430000);
+    expect(paid?.paidNote).toBe("Đóng sớm");
+    const reverted = await repo.unpayBill(String(created?._id));
+    expect(reverted?.paid).toBe(false);
+    expect(reverted?.paidAt).toBeUndefined();
+  });
+
   it("lists bills", async () => {
     const list = await repo.listBills();
     expect(list.length).toBeGreaterThan(0);
+  });
+
+  it("deletes a bill", async () => {
+    const created = await repo.upsertBill({
+      name: "Netflix",
+      amount: 260000,
+      dueDay: 15,
+    });
+    const removed = await repo.deleteBillById(String(created?._id));
+    expect(removed?.name).toBe("Netflix");
   });
 });

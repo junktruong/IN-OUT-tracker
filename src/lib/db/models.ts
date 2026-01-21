@@ -27,6 +27,8 @@ const billSchema = new Schema(
     note: { type: String },
     paid: { type: Boolean, default: false },
     paidAt: { type: Date },
+    paidAmount: { type: Number },
+    paidNote: { type: String },
   },
   { versionKey: false }
 );
