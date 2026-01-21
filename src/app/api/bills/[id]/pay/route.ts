@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { payBill } from "@/lib/repo/billsRepo";
-
 
 const bodySchema = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -11,19 +10,19 @@ const bodySchema = z.object({
 });
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   const body = await request.json();
   const parse = bodySchema.safeParse(body);
 
   if (!parse.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
   }
-const IdPayload = (await params).id;
   const payload = parse.data;
   const updated = await payBill(
-    IdPayload,
+    id,
     new Date(`${payload.paidAt}T00:00:00`),
     payload.paidAmount,
     payload.paidNote
