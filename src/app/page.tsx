@@ -7,6 +7,7 @@ import { CalendarMonth } from "@/components/dashboard/CalendarMonth";
 import { DayPanel } from "@/components/dashboard/DayPanel";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { BillsInWindow } from "@/components/dashboard/BillsInWindow";
+import { AnalyticsSection } from "@/components/dashboard/AnalyticsSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { addMonths, monthKey, toYmd } from "@/lib/domain/date";
@@ -128,8 +129,8 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3 text-sm font-semibold">
+        <CardContent className="flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
             <Button variant="outline" size="sm" onClick={() => handleMonthChange(-1)}>
               <ChevronLeft className="h-4 w-4" />
               Prev month
@@ -170,6 +171,8 @@ export default function HomePage() {
           onReload={() => loadMonth(month)}
         />
       </div>
+
+      <AnalyticsSection monthKey={month} transactions={transactions} monthSummary={monthSummary} />
 
       <div className="text-xs text-muted-foreground">
         Tổng giao dịch trong tháng: {formatCurrency(monthSummary.expense + monthSummary.income)}

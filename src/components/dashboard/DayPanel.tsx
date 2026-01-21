@@ -169,11 +169,11 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
 
   return (
     <Card className="h-full">
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="text-lg">{dayKey}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-3 gap-3 rounded-xl bg-muted/40 p-4 text-sm">
+        <div className="grid grid-cols-3 gap-3 rounded-xl bg-muted/40 p-3 text-sm sm:p-4">
           <div>
             <p className="text-xs uppercase text-muted-foreground">Ra</p>
             <p className="mt-1 text-base font-semibold text-rose-600">
@@ -200,7 +200,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
             value={raw}
             onChange={(event) => setRaw(event.target.value)}
             placeholder={`phở 45k; cafe 25k\n[Đi lại] Grab 70k @Grab\n+ [Lương] 15000000 @Công ty`}
-            className="min-h-[120px]"
+            className="min-h-[120px] md:min-h-[160px]"
           />
           <Button className="w-full" onClick={handleSubmit} disabled={loading}>
             {loading ? "Đang thêm..." : "Thêm"}
@@ -238,7 +238,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               className="h-9 w-full md:w-48"
             />
           </div>
-          <div className="space-y-3">
+          <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1 md:max-h-[520px]">
             {filtered.map((item) => (
               <div
                 key={item.id}
@@ -283,7 +283,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
       </CardContent>
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Chi tiết giao dịch</DialogTitle>
           </DialogHeader>
