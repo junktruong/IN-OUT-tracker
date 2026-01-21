@@ -243,7 +243,7 @@ export default function BillsPage() {
                       <Button variant="outline" size="sm" onClick={() => handleEdit(bill)}>
                         Sửa
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(bill)}>
+                      <Button variant="outline" size="sm" onClick={() => handleDelete(bill)}>
                         Xoá
                       </Button>
                       {bill.paid ? (
@@ -251,7 +251,7 @@ export default function BillsPage() {
                           Hoàn tác
                         </Button>
                       ) : (
-                        <Button size="sm" onClick={() => openPayDialog(bill)}>
+                        <Button size="sm" variant="outline" onClick={() => openPayDialog(bill)}>
                           Xác nhận đã đóng
                         </Button>
                       )}
@@ -268,7 +268,7 @@ export default function BillsPage() {
           <DialogHeader>
             <DialogTitle>Xác nhận đã đóng</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="grid gap-3 ">
             <Input
               type="date"
               value={payForm.paidAt}

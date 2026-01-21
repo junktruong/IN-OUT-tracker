@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { payBill } from "@/lib/repo/billsRepo";
 
+
 const bodySchema = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paidAmount: z.number().positive().optional(),
@@ -19,10 +20,10 @@ export async function PATCH(
   if (!parse.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
   }
-
+const IdPayload = (await params).id;
   const payload = parse.data;
   const updated = await payBill(
-    params.id,
+    IdPayload,
     new Date(`${payload.paidAt}T00:00:00`),
     payload.paidAmount,
     payload.paidNote
