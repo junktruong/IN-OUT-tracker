@@ -264,7 +264,7 @@ export default function BillsPage() {
       </Tabs>
 
       <Dialog open={!!payingBill} onOpenChange={(open) => !open && setPayingBill(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Xác nhận đã đóng</DialogTitle>
           </DialogHeader>
