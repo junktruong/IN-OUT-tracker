@@ -23,6 +23,8 @@ export type BillDTO = {
   note?: string;
   paid: boolean;
   paidAt?: string;
+  paidAmount?: number;
+  paidNote?: string;
 };
 
 export type SettingsDTO = {

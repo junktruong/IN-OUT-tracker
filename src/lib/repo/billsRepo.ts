@@ -56,3 +56,36 @@ export const toggleBillPaid = async (id: string, paid: boolean, paidAt: Date | n
     { new: true }
   ).lean();
 };
+
+export const payBill = async (
+  id: string,
+  paidAt: Date,
+  paidAmount?: number,
+  paidNote?: string
+) => {
+  await connectToDatabase();
+  return BillModel.findByIdAndUpdate(
+    id,
+    {
+      paid: true,
+      paidAt,
+      paidAmount: paidAmount ?? undefined,
+      paidNote: paidNote ?? undefined,
+    },
+    { new: true }
+  ).lean();
+};
+
+export const unpayBill = async (id: string) => {
+  await connectToDatabase();
+  return BillModel.findByIdAndUpdate(
+    id,
+    { paid: false, paidAt: undefined, paidAmount: undefined, paidNote: undefined },
+    { new: true }
+  ).lean();
+};
+
+export const deleteBillById = async (id: string) => {
+  await connectToDatabase();
+  return BillModel.findByIdAndDelete(id).lean();
+};

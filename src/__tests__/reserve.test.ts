@@ -41,6 +41,23 @@ describe("reserveInWindow", () => {
     expect(result.total).toBe(0);
   });
 
+  it("computes due date around payroll window", () => {
+    const result = reserveInWindow(
+      [
+        {
+          id: "1",
+          name: "Bảo hiểm",
+          amount: 900000,
+          dueDay: 5,
+          paid: false,
+        },
+      ],
+      window
+    );
+
+    expect(result.items[0]?.dueDate).toBe("2024-06-05");
+  });
+
   it("respects start and end date", () => {
     const result = reserveInWindow(
       [
@@ -51,6 +68,24 @@ describe("reserveInWindow", () => {
           dueDay: 25,
           paid: false,
           start: new Date("2024-06-01T00:00:00"),
+        },
+      ],
+      window
+    );
+
+    expect(result.total).toBe(0);
+  });
+
+  it("excludes bills after end date", () => {
+    const result = reserveInWindow(
+      [
+        {
+          id: "1",
+          name: "Hội phí",
+          amount: 100000,
+          dueDay: 20,
+          paid: false,
+          end: new Date("2024-05-10T00:00:00"),
         },
       ],
       window
