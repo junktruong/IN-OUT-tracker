@@ -43,7 +43,10 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
   const [saving, setSaving] = useState(false);
   const [confirmText, setConfirmText] = useState("");
 
-  const sorted = [...items].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const sorted = useMemo(
+    () => [...items].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [items]
+  );
   const filtered = useMemo(() => {
     return sorted.filter((item) => {
       if (filter !== "all" && item.type !== filter) {
@@ -78,7 +81,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
       setRaw("");
       toast.success(`Đã thêm ${result.added} dòng, bỏ qua ${result.skipped.length} dòng.`);
       onReload();
-    } catch (error) {
+    } catch {
       toast.error("Không thể thêm giao dịch.");
     } finally {
       setLoading(false);
@@ -134,7 +137,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
       toast.success("Đã cập nhật giao dịch.");
       setEditing(null);
       onReload();
-    } catch (error) {
+    } catch {
       toast.error("Không thể cập nhật giao dịch.");
     } finally {
       setSaving(false);
@@ -160,7 +163,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
       toast.success("Đã xoá giao dịch.");
       setEditing(null);
       onReload();
-    } catch (error) {
+    } catch {
       toast.error("Không thể xoá giao dịch.");
     } finally {
       setSaving(false);
@@ -169,26 +172,26 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-2">
+      <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
         <CardTitle className="text-lg">{dayKey}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-3 gap-3 rounded-xl bg-muted/40 p-3 text-sm sm:p-4">
-          <div>
+      <CardContent className="space-y-5 p-4 pt-0 sm:space-y-6 sm:p-6 sm:pt-0">
+        <div className="grid gap-3 rounded-lg bg-muted/40 p-3 text-sm min-[420px]:grid-cols-3 sm:p-4">
+          <div className="min-w-0">
             <p className="text-xs uppercase text-muted-foreground">Ra</p>
-            <p className="mt-1 text-base font-semibold text-rose-600">
+            <p className="mt-1 break-words text-sm font-semibold text-rose-600 sm:text-base">
               {formatCurrency(daySummary.expense)}
             </p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs uppercase text-muted-foreground">Vào</p>
-            <p className="mt-1 text-base font-semibold text-emerald-600">
+            <p className="mt-1 break-words text-sm font-semibold text-emerald-600 sm:text-base">
               {formatCurrency(daySummary.income)}
             </p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs uppercase text-muted-foreground">Ròng</p>
-            <p className="mt-1 text-base font-semibold text-foreground">
+            <p className="mt-1 break-words text-sm font-semibold text-foreground sm:text-base">
               {formatCurrency(daySummary.net)}
             </p>
           </div>
@@ -200,7 +203,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
             value={raw}
             onChange={(event) => setRaw(event.target.value)}
             placeholder={`phở 45k; cafe 25k\n[Đi lại] Grab 70k @Grab\n+ [Lương] 15000000 @Công ty`}
-            className="min-h-[120px] md:min-h-[160px]"
+            className="min-h-[110px] sm:min-h-[140px] md:min-h-[160px]"
           />
           <Button className="w-full" onClick={handleSubmit} disabled={loading}>
             {loading ? "Đang thêm..." : "Thêm"}
@@ -209,8 +212,9 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
 
         <div className="space-y-3">
           <p className="text-sm font-semibold">Giao dịch trong ngày</p>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <Button
+              className="w-full sm:w-auto"
               size="sm"
               variant={filter === "all" ? "default" : "outline"}
               onClick={() => setFilter("all")}
@@ -218,6 +222,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               Tất cả
             </Button>
             <Button
+              className="w-full sm:w-auto"
               size="sm"
               variant={filter === "expense" ? "default" : "outline"}
               onClick={() => setFilter("expense")}
@@ -225,6 +230,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               Chi tiêu
             </Button>
             <Button
+              className="w-full sm:w-auto"
               size="sm"
               variant={filter === "income" ? "default" : "outline"}
               onClick={() => setFilter("income")}
@@ -235,18 +241,18 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="Tìm nhanh..."
-              className="h-9 w-full md:w-48"
+              className="col-span-3 h-10 w-full sm:w-56"
             />
           </div>
           <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1 md:max-h-[520px]">
             {filtered.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start justify-between rounded-xl border bg-background px-4 py-3"
+                className="flex flex-col gap-3 rounded-lg border bg-background px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
               >
-                <div className="flex items-start gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-full text-white ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
                       item.type === "income" ? "bg-emerald-500" : "bg-rose-500"
                     }`}
                   >
@@ -256,23 +262,28 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
                       <ArrowDownRight className="h-4 w-4" />
                     )}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {item.desc} — {formatCurrency(item.amount)}
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-semibold">
+                      {item.desc} - {formatCurrency(item.amount)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="break-words text-xs text-muted-foreground">
                       {item.category} {item.source ? `• ${item.source}` : ""}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
                   <p className="text-xs text-muted-foreground">
                     {new Date(item.createdAt).toLocaleTimeString("vi-VN", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </p>
-                  <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                  <Button
+                    className="w-auto sm:w-full"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openEdit(item)}
+                  >
                     Xem/Sửa
                   </Button>
                 </div>
@@ -287,14 +298,14 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
           <DialogHeader>
             <DialogTitle>Chi tiết giao dịch</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Input
               type="date"
               value={form.date}
               onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
             />
             <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 rounded-md border border-input bg-background px-3 text-base sm:text-sm"
               value={form.type}
               onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
             >
@@ -302,6 +313,9 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               <option value="income">Thu nhập</option>
             </select>
             <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
               placeholder="Số tiền"
               value={form.amount}
               onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
@@ -312,7 +326,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
             />
             <Input
-              className="md:col-span-2"
+              className="sm:col-span-2"
               placeholder="Mô tả"
               value={form.desc}
               onChange={(event) => setForm((prev) => ({ ...prev, desc: event.target.value }))}
@@ -338,17 +352,17 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
             />
             <Input
-              className="md:col-span-2"
+              className="sm:col-span-2"
               placeholder='Nhập "DELETE" để xoá'
               value={confirmText}
               onChange={(event) => setConfirmText(event.target.value)}
             />
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleDelete} disabled={saving}>
+            <Button className="w-full sm:w-auto" variant="outline" onClick={handleDelete} disabled={saving}>
               Xoá
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button className="w-full sm:w-auto" onClick={handleSave} disabled={saving}>
               {saving ? "Đang lưu..." : "Lưu"}
             </Button>
           </DialogFooter>

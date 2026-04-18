@@ -49,55 +49,57 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
 
   return (
     <Card>
-      <CardHeader className="space-y-1">
+      <CardHeader className="space-y-1 p-4 sm:p-6">
         <CardTitle className="text-lg">Phân tích tháng</CardTitle>
         <p className="text-xs text-muted-foreground">Theo dõi xu hướng chi/thu của tháng {monthKey}</p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
         <Tabs defaultValue="trend" className="space-y-4">
-          <TabsList className="flex w-full flex-wrap justify-start gap-2 md:w-auto md:gap-0">
-            <TabsTrigger value="trend">Xu hướng</TabsTrigger>
-            <TabsTrigger value="category">Danh mục</TabsTrigger>
-            <TabsTrigger value="overview">Tổng quan</TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 md:inline-flex md:w-auto md:gap-0">
+            <TabsTrigger className="min-w-0 px-2" value="trend">Xu hướng</TabsTrigger>
+            <TabsTrigger className="min-w-0 px-2" value="category">Danh mục</TabsTrigger>
+            <TabsTrigger className="min-w-0 px-2" value="overview">Tổng quan</TabsTrigger>
           </TabsList>
 
           <TabsContent value="trend">
-            <div className="h-64 w-full sm:h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendSeries} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.05} />
-                    </linearGradient>
-                    <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `${Number(value) / 1000}k`} />
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="expense"
-                    name="Chi"
-                    stroke="#f43f5e"
-                    fill="url(#expenseGradient)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="income"
-                    name="Thu"
-                    stroke="#10b981"
-                    fill="url(#incomeGradient)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="-mx-2 overflow-x-auto pb-2">
+              <div className="h-64 min-w-[560px] px-2 sm:h-72 sm:min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendSeries} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="expense"
+                      name="Chi"
+                      stroke="#f43f5e"
+                      fill="url(#expenseGradient)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      name="Thu"
+                      stroke="#10b981"
+                      fill="url(#incomeGradient)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </TabsContent>
 
@@ -105,20 +107,22 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
             {categorySeries.length === 0 ? (
               <p className="text-sm text-muted-foreground">Chưa có giao dịch chi tiêu trong tháng.</p>
             ) : (
-              <div className="h-64 w-full sm:h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categorySeries} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="category" tick={{ fontSize: 11 }} interval={0} angle={-20} dy={10} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `${Number(value) / 1000}k`} />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    <Bar dataKey="amount" name="Chi" radius={[6, 6, 0, 0]}>
-                      {categorySeries.map((entry, index) => (
-                        <Cell key={entry.category} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="-mx-2 overflow-x-auto pb-2">
+                <div className="h-64 min-w-[560px] px-2 sm:h-72 sm:min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={categorySeries} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="category" tick={{ fontSize: 11 }} interval={0} angle={-20} dy={10} />
+                      <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Bar dataKey="amount" name="Chi" radius={[6, 6, 0, 0]}>
+                        {categorySeries.map((entry, index) => (
+                          <Cell key={entry.category} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
           </TabsContent>
@@ -127,7 +131,7 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
             {monthSummary.income === 0 && monthSummary.expense === 0 ? (
               <p className="text-sm text-muted-foreground">Chưa có dữ liệu tổng quan trong tháng.</p>
             ) : (
-              <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+              <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
                 <div className="h-64 w-full sm:h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -151,19 +155,19 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
                 <div className="space-y-3 text-sm">
                   <div className="rounded-lg border bg-muted/40 p-4">
                     <p className="text-xs uppercase text-muted-foreground">Thu</p>
-                    <p className="mt-1 text-lg font-semibold text-emerald-600">
+                    <p className="mt-1 break-words text-lg font-semibold text-emerald-600">
                       {formatCurrency(monthSummary.income)}
                     </p>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-4">
                     <p className="text-xs uppercase text-muted-foreground">Chi</p>
-                    <p className="mt-1 text-lg font-semibold text-rose-600">
+                    <p className="mt-1 break-words text-lg font-semibold text-rose-600">
                       {formatCurrency(monthSummary.expense)}
                     </p>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-4">
                     <p className="text-xs uppercase text-muted-foreground">Ròng</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
+                    <p className="mt-1 break-words text-lg font-semibold text-foreground">
                       {formatCurrency(monthSummary.net)}
                     </p>
                   </div>

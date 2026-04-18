@@ -12,6 +12,26 @@ export type BillPayload = {
   note?: string;
 };
 
+const optionalBillFields = (payload: BillPayload) => {
+  const $set: Record<string, string | Date> = {};
+  const $unset: Record<string, ""> = {};
+
+  const setOrUnset = (key: "group" | "start" | "end" | "note", value?: string | Date | null) => {
+    if (value === undefined || value === null || value === "") {
+      $unset[key] = "";
+      return;
+    }
+    $set[key] = value;
+  };
+
+  setOrUnset("group", payload.group);
+  setOrUnset("start", payload.start);
+  setOrUnset("end", payload.end);
+  setOrUnset("note", payload.note);
+
+  return { $set, $unset };
+};
+
 export const listBills = async () => {
   await connectToDatabase();
   return BillModel.find().sort({ dueDay: 1 }).lean();
@@ -20,18 +40,19 @@ export const listBills = async () => {
 export const upsertBill = async (payload: BillPayload) => {
   await connectToDatabase();
   if (payload.id) {
+    const optional = optionalBillFields(payload);
     return BillModel.findByIdAndUpdate(
       payload.id,
       {
-        name: payload.name,
-        amount: payload.amount,
-        dueDay: payload.dueDay,
-        group: payload.group,
-        start: payload.start ?? undefined,
-        end: payload.end ?? undefined,
-        note: payload.note,
+        $set: {
+          name: payload.name,
+          amount: payload.amount,
+          dueDay: payload.dueDay,
+          ...optional.$set,
+        },
+        $unset: optional.$unset,
       },
-      { new: true, upsert: true }
+      { new: true }
     ).lean();
   }
 
@@ -52,7 +73,9 @@ export const toggleBillPaid = async (id: string, paid: boolean, paidAt: Date | n
   await connectToDatabase();
   return BillModel.findByIdAndUpdate(
     id,
-    { paid, paidAt: paidAt ?? undefined },
+    paidAt
+      ? { $set: { paid, paidAt } }
+      : { $set: { paid }, $unset: { paidAt: "", paidAmount: "", paidNote: "" } },
     { new: true }
   ).lean();
 };
@@ -64,13 +87,29 @@ export const payBill = async (
   paidNote?: string
 ) => {
   await connectToDatabase();
+  const $set: Record<string, boolean | Date | number | string> = {
+    paid: true,
+    paidAt,
+  };
+  const $unset: Record<string, ""> = {};
+
+  if (paidAmount === undefined) {
+    $unset.paidAmount = "";
+  } else {
+    $set.paidAmount = paidAmount;
+  }
+
+  if (!paidNote) {
+    $unset.paidNote = "";
+  } else {
+    $set.paidNote = paidNote;
+  }
+
   return BillModel.findByIdAndUpdate(
     id,
     {
-      paid: true,
-      paidAt,
-      paidAmount: paidAmount ?? undefined,
-      paidNote: paidNote ?? undefined,
+      $set,
+      $unset,
     },
     { new: true }
   ).lean();
@@ -80,7 +119,7 @@ export const unpayBill = async (id: string) => {
   await connectToDatabase();
   return BillModel.findByIdAndUpdate(
     id,
-    { paid: false, paidAt: undefined, paidAmount: undefined, paidNote: undefined },
+    { $set: { paid: false }, $unset: { paidAt: "", paidAmount: "", paidNote: "" } },
     { new: true }
   ).lean();
 };

@@ -28,9 +28,9 @@ describe("quickParse", () => {
   });
 
   it("skips invalid lines", () => {
-    const result = quickParse("không có tiền\nđi chơi -100");
+    const result = quickParse("không có tiền\nđi chơi -100\nhoàn tiền - 100k");
     expect(result.items).toHaveLength(0);
-    expect(result.skipped).toHaveLength(2);
+    expect(result.skipped).toHaveLength(3);
   });
 
   it("uses default category and desc", () => {

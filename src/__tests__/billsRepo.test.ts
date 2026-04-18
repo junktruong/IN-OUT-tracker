@@ -41,6 +41,29 @@ describe("billsRepo", () => {
     expect(updated?.name).toBe("Internet Fiber");
   });
 
+  it("clears optional fields when updating a bill", async () => {
+    const created = await repo.upsertBill({
+      name: "Gói tập",
+      amount: 500000,
+      dueDay: 20,
+      group: "Sức khoẻ",
+      start: new Date("2024-05-01"),
+      end: new Date("2024-12-31"),
+      note: "Theo quý",
+    });
+    const updated = await repo.upsertBill({
+      id: String(created?._id),
+      name: "Gói tập",
+      amount: 500000,
+      dueDay: 20,
+    });
+
+    expect(updated?.group).toBeUndefined();
+    expect(updated?.start).toBeUndefined();
+    expect(updated?.end).toBeUndefined();
+    expect(updated?.note).toBeUndefined();
+  });
+
   it("toggles paid status", async () => {
     const created = await repo.upsertBill({
       name: "Gửi xe",
@@ -75,6 +98,8 @@ describe("billsRepo", () => {
     const reverted = await repo.unpayBill(String(created?._id));
     expect(reverted?.paid).toBe(false);
     expect(reverted?.paidAt).toBeUndefined();
+    expect(reverted?.paidAmount).toBeUndefined();
+    expect(reverted?.paidNote).toBeUndefined();
   });
 
   it("lists bills", async () => {

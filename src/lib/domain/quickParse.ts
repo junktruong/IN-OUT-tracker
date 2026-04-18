@@ -14,21 +14,26 @@ const splitEntries = (raw: string) =>
 
 const parseAmount = (input: string) => {
   const matches = [...input.matchAll(/([0-9][0-9.,\s]*k?)/gi)];
-  if (matches.length === 0) {
-    return null;
+  for (let i = matches.length - 1; i >= 0; i -= 1) {
+    const match = matches[i];
+    const rawToken = match[1];
+    const index = match.index ?? 0;
+    const prefix = input.slice(0, index).trimEnd();
+
+    if (/[-−–—]$/.test(prefix)) {
+      continue;
+    }
+
+    const isK = /k$/i.test(rawToken.trim());
+    const digits = rawToken.replace(/[^0-9]/g, "");
+    const value = Number(digits) * (isK ? 1000 : 1);
+
+    if (Number.isFinite(value) && value > 0) {
+      return { value, token: rawToken, index };
+    }
   }
 
-  const last = matches[matches.length - 1];
-  const rawToken = last[1];
-  const isK = /k$/i.test(rawToken.trim());
-  const digits = rawToken.replace(/[^0-9]/g, "");
-  const value = Number(digits) * (isK ? 1000 : 1);
-
-  if (!Number.isFinite(value) || value <= 0) {
-    return null;
-  }
-
-  return { value, token: rawToken, index: last.index ?? 0 };
+  return null;
 };
 
 export const quickParse = (raw: string) => {

@@ -56,65 +56,69 @@ export function CalendarMonth({ monthKey, byDay, selectedDay, onSelectDay }: Cal
   const cells = buildCalendarCells(monthKey);
 
   return (
-    <Card className="p-3 sm:p-4">
-      <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-semibold text-muted-foreground sm:gap-2 sm:text-xs">
-        {weekdayLabels.map((label) => (
-          <span key={label}>{label}</span>
-        ))}
-      </div>
-      <div className="mt-2 grid grid-cols-7 gap-1.5 sm:mt-3 sm:gap-2">
-        {cells.map((cell, index) => {
-          if (!cell.dayKey) {
-            return (
-              <div key={`empty-${index}`} className="h-16 rounded-lg sm:h-24" />
-            );
-          }
+    <Card className="overflow-hidden p-3 sm:p-4">
+      <div className="-mx-1 overflow-x-auto pb-1">
+        <div className="min-w-[620px] px-1 sm:min-w-0 sm:px-0">
+          <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-semibold text-muted-foreground sm:gap-2 sm:text-xs">
+            {weekdayLabels.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-7 gap-1.5 sm:mt-3 sm:gap-2">
+            {cells.map((cell, index) => {
+              if (!cell.dayKey) {
+                return (
+                  <div key={`empty-${index}`} className="h-20 rounded-md sm:h-24" />
+                );
+              }
 
-          const totals = sumDay(byDay.get(cell.dayKey) ?? []);
-          const hasActivity = totals.income > 0 || totals.expense > 0;
-          const isSelected = cell.dayKey === selectedDay;
+              const totals = sumDay(byDay.get(cell.dayKey) ?? []);
+              const hasActivity = totals.income > 0 || totals.expense > 0;
+              const isSelected = cell.dayKey === selectedDay;
 
-          return (
-            <button
-              key={cell.dayKey}
-              onClick={() => onSelectDay(cell.dayKey!)}
-              className={cn(
-                "flex h-16 flex-col justify-between rounded-lg border px-2 py-1.5 text-left text-[10px] transition sm:h-24 sm:px-3 sm:py-2 sm:text-xs",
-                isSelected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background",
-                hasActivity && !isSelected && "bg-emerald-50/60"
-              )}
-            >
-              <span
-                className={cn(
-                  "text-xs font-semibold sm:text-sm",
-                  isSelected ? "text-primary-foreground" : "text-foreground"
-                )}
-              >
-                {String(cell.label).padStart(2, "0")}
-              </span>
-              <div className="space-y-1">
-                <p
+              return (
+                <button
+                  key={cell.dayKey}
+                  onClick={() => onSelectDay(cell.dayKey!)}
                   className={cn(
-                    "text-[10px] sm:text-[11px]",
-                    isSelected ? "text-rose-100" : "text-rose-500"
+                    "flex h-20 min-w-0 flex-col justify-between rounded-md border px-2 py-1.5 text-left text-[10px] transition sm:h-24 sm:px-3 sm:py-2 sm:text-xs",
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background",
+                    hasActivity && !isSelected && "bg-emerald-50/60"
                   )}
                 >
-                  Ra: {formatCurrency(totals.expense)}
-                </p>
-                <p
-                  className={cn(
-                    "text-[10px] sm:text-[11px]",
-                    isSelected ? "text-emerald-100" : "text-emerald-600"
-                  )}
-                >
-                  Vào: {formatCurrency(totals.income)}
-                </p>
-              </div>
-            </button>
-          );
-        })}
+                  <span
+                    className={cn(
+                      "text-xs font-semibold sm:text-sm",
+                      isSelected ? "text-primary-foreground" : "text-foreground"
+                    )}
+                  >
+                    {String(cell.label).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0 space-y-1">
+                    <p
+                      className={cn(
+                        "truncate text-[10px] tabular-nums sm:text-[11px]",
+                        isSelected ? "text-rose-100" : "text-rose-500"
+                      )}
+                    >
+                      Ra: {formatCurrency(totals.expense)}
+                    </p>
+                    <p
+                      className={cn(
+                        "truncate text-[10px] tabular-nums sm:text-[11px]",
+                        isSelected ? "text-emerald-100" : "text-emerald-600"
+                      )}
+                    >
+                      Vào: {formatCurrency(totals.income)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Card>
   );

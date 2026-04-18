@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -33,15 +33,35 @@ export default function BillsPage() {
     paidNote: "",
   });
 
-  const loadBills = async () => {
+  const fetchBills = useCallback(async () => {
     const response = await fetch("/api/bills");
+    if (!response.ok) {
+      throw new Error("Không thể tải khoản đóng.");
+    }
     const data = await response.json();
-    setBills(data.items ?? []);
-  };
+    return (data.items ?? []) as BillDTO[];
+  }, []);
+
+  const loadBills = useCallback(async () => {
+    setBills(await fetchBills());
+  }, [fetchBills]);
 
   useEffect(() => {
-    loadBills();
-  }, []);
+    let ignore = false;
+
+    const loadInitialBills = async () => {
+      const items = await fetchBills();
+      if (!ignore) {
+        setBills(items);
+      }
+    };
+
+    void loadInitialBills();
+
+    return () => {
+      ignore = true;
+    };
+  }, [fetchBills]);
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
@@ -90,7 +110,7 @@ export default function BillsPage() {
     toast.success("Đã lưu khoản đóng.");
     setForm({ name: "", amount: "", dueDay: "", group: "", start: "", end: "", note: "" });
     setEditingId(null);
-    loadBills();
+    void loadBills();
   };
 
   const handleEdit = (bill: BillDTO) => {
@@ -119,7 +139,7 @@ export default function BillsPage() {
       return;
     }
     toast.success("Đã xoá khoản đóng.");
-    loadBills();
+    void loadBills();
   };
 
   const openPayDialog = (bill: BillDTO) => {
@@ -140,9 +160,14 @@ export default function BillsPage() {
       toast.error("Vui lòng chọn ngày đóng.");
       return;
     }
+    const paidAmount = payForm.paidAmount.trim() ? Number(payForm.paidAmount) : undefined;
+    if (paidAmount !== undefined && (!Number.isFinite(paidAmount) || paidAmount <= 0)) {
+      toast.error("Số tiền đã đóng phải lớn hơn 0.");
+      return;
+    }
     const payload = {
       paidAt: payForm.paidAt,
-      paidAmount: payForm.paidAmount ? Number(payForm.paidAmount) : undefined,
+      paidAmount,
       paidNote: payForm.paidNote || undefined,
     };
     const response = await fetch(`/api/bills/${payingBill.id}/pay`, {
@@ -156,7 +181,7 @@ export default function BillsPage() {
     }
     toast.success("Đã xác nhận đóng.");
     setPayingBill(null);
-    loadBills();
+    void loadBills();
   };
 
   const handleUnpay = async (bill: BillDTO) => {
@@ -168,30 +193,37 @@ export default function BillsPage() {
       return;
     }
     toast.success("Đã hoàn tác.");
-    loadBills();
+    void loadBills();
   };
 
   const visibleBills = bills.filter((bill) => (filter === "unpaid" ? !bill.paid : true));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle>Khoản đóng theo tháng</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
+        <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Input
               placeholder="Tên khoản đóng"
               value={form.name}
               onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
             />
             <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
               placeholder="Số tiền"
               value={form.amount}
               onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
             />
             <Input
+              type="number"
+              min={1}
+              max={31}
+              inputMode="numeric"
               placeholder="Ngày đến hạn (1-31)"
               value={form.dueDay}
               onChange={(event) => setForm((prev) => ({ ...prev, dueDay: event.target.value }))}
@@ -212,53 +244,64 @@ export default function BillsPage() {
               onChange={(event) => setForm((prev) => ({ ...prev, end: event.target.value }))}
             />
             <Input
-              className="md:col-span-2"
+              className="sm:col-span-2"
               placeholder="Ghi chú"
               value={form.note}
               onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
             />
           </div>
-          <Button onClick={handleSubmit}>Lưu khoản đóng</Button>
+          <Button className="w-full sm:w-auto" onClick={handleSubmit}>Lưu khoản đóng</Button>
         </CardContent>
       </Card>
 
-      <Tabs value={filter} onValueChange={(value) => setFilter(value as "all" | "unpaid")}
-        className="space-y-4">
-        <TabsList>
+      <Tabs
+        value={filter}
+        onValueChange={(value) => setFilter(value as "all" | "unpaid")}
+        className="space-y-4"
+      >
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-flex sm:w-auto sm:gap-0">
           <TabsTrigger value="unpaid">Chưa đóng</TabsTrigger>
           <TabsTrigger value="all">Tất cả</TabsTrigger>
         </TabsList>
         <TabsContent value={filter}>
           <div className="space-y-3">
-            {visibleBills.map((bill) => (
+            {visibleBills.length === 0 ? (
+              <Card>
+                <CardContent className="p-4 text-sm text-muted-foreground">
+                  Không có khoản đóng phù hợp.
+                </CardContent>
+              </Card>
+            ) : (
+              visibleBills.map((bill) => (
                 <Card key={bill.id}>
-                  <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">{bill.name}</p>
+                  <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold">{bill.name}</p>
                       <p className="text-xs text-muted-foreground">
                         Đến hạn ngày {bill.dueDay} • {formatCurrency(bill.amount)}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(bill)}>
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                      <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => handleEdit(bill)}>
                         Sửa
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(bill)}>
+                      <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => handleDelete(bill)}>
                         Xoá
                       </Button>
                       {bill.paid ? (
-                        <Button size="sm" variant="outline" onClick={() => handleUnpay(bill)}>
+                        <Button className="col-span-2 w-full sm:w-auto" size="sm" variant="outline" onClick={() => handleUnpay(bill)}>
                           Hoàn tác
                         </Button>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => openPayDialog(bill)}>
+                        <Button className="col-span-2 w-full sm:w-auto" size="sm" variant="outline" onClick={() => openPayDialog(bill)}>
                           Xác nhận đã đóng
                         </Button>
                       )}
                     </div>
                   </CardContent>
                 </Card>
-            ))}
+              ))
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -268,13 +311,16 @@ export default function BillsPage() {
           <DialogHeader>
             <DialogTitle>Xác nhận đã đóng</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 ">
+          <div className="grid gap-3">
             <Input
               type="date"
               value={payForm.paidAt}
               onChange={(event) => setPayForm((prev) => ({ ...prev, paidAt: event.target.value }))}
             />
             <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
               placeholder="Số tiền đã đóng"
               value={payForm.paidAmount}
               onChange={(event) =>
@@ -288,7 +334,7 @@ export default function BillsPage() {
             />
           </div>
           <DialogFooter>
-            <Button onClick={handleConfirmPay}>Xác nhận</Button>
+            <Button className="w-full sm:w-auto" onClick={handleConfirmPay}>Xác nhận</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

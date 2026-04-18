@@ -29,27 +29,27 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="min-h-screen bg-muted/40">
           <header className="border-b bg-background">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-lg font-semibold">IN-OUT Tracker</p>
                 <p className="text-xs text-muted-foreground">
                   Quản lý thu chi theo tháng
                 </p>
               </div>
-              <nav className="flex items-center gap-4 text-sm">
-                <Link className="text-muted-foreground hover:text-foreground" href="/">
+              <nav className="grid w-full grid-cols-3 gap-2 text-sm md:w-auto md:flex md:items-center md:gap-4">
+                <Link className="rounded-md px-3 py-2 text-center text-muted-foreground hover:bg-accent hover:text-foreground md:px-0 md:py-0 md:text-left md:hover:bg-transparent" href="/">
                   Dashboard
                 </Link>
-                <Link className="text-muted-foreground hover:text-foreground" href="/bills">
+                <Link className="rounded-md px-3 py-2 text-center text-muted-foreground hover:bg-accent hover:text-foreground md:px-0 md:py-0 md:text-left md:hover:bg-transparent" href="/bills">
                   Khoản đóng
                 </Link>
-                <Link className="text-muted-foreground hover:text-foreground" href="/settings">
+                <Link className="rounded-md px-3 py-2 text-center text-muted-foreground hover:bg-accent hover:text-foreground md:px-0 md:py-0 md:text-left md:hover:bg-transparent" href="/settings">
                   Cài đặt
                 </Link>
               </nav>
             </div>
           </header>
-          <main className="mx-auto w-full max-w-6xl px-6 py-8">
+          <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
             {children}
           </main>
         </div>

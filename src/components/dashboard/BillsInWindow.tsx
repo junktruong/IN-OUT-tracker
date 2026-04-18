@@ -13,10 +13,10 @@ export function BillsInWindow({ bills, reserveTotal }: { bills: ReserveBill[]; r
 
   return (
     <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold">Khoản cần đóng trong kỳ</p>
-          <span className="text-xs font-semibold text-amber-600">
+          <span className="text-sm font-semibold text-amber-600 sm:text-xs">
             {formatCurrency(reserveTotal)}
           </span>
         </div>
@@ -27,13 +27,15 @@ export function BillsInWindow({ bills, reserveTotal }: { bills: ReserveBill[]; r
             bills.map((bill) => (
               <div
                 key={bill.id}
-                className="flex items-center justify-between rounded-xl border px-3 py-2"
+                className="flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div>
-                  <p className="text-sm font-medium">{bill.name}</p>
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-medium">{bill.name}</p>
                   <p className="text-xs text-muted-foreground">Đến hạn {bill.dueDate}</p>
                 </div>
-                <p className="text-sm font-semibold">{formatCurrency(bill.amount)}</p>
+                <p className="break-words text-sm font-semibold sm:text-right">
+                  {formatCurrency(bill.amount)}
+                </p>
               </div>
             ))
           )}

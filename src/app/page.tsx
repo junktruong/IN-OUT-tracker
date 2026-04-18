@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { CalendarMonth } from "@/components/dashboard/CalendarMonth";
@@ -25,33 +25,72 @@ export default function HomePage() {
   const [bills, setBills] = useState<BillDTO[]>([]);
   const [settings, setSettings] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
 
-  const loadMonth = async (targetMonth: string) => {
+  const fetchMonth = useCallback(async (targetMonth: string) => {
     const response = await fetch(`/api/transactions?month=${targetMonth}`);
+    if (!response.ok) {
+      throw new Error("Không thể tải giao dịch.");
+    }
     const data = await response.json();
-    setTransactions(data.items ?? []);
-  };
-
-  const loadBills = async () => {
-    const response = await fetch("/api/bills");
-    const data = await response.json();
-    setBills(data.items ?? []);
-  };
-
-  const loadSettings = async () => {
-    const response = await fetch("/api/settings");
-    const data = await response.json();
-    setSettings(data);
-  };
-
-  useEffect(() => {
-    loadSettings();
-    loadBills();
-    loadMonth(month);
+    return (data.items ?? []) as TransactionDTO[];
   }, []);
 
+  const fetchBills = useCallback(async () => {
+    const response = await fetch("/api/bills");
+    if (!response.ok) {
+      throw new Error("Không thể tải khoản đóng.");
+    }
+    const data = await response.json();
+    return (data.items ?? []) as BillDTO[];
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    const response = await fetch("/api/settings");
+    if (!response.ok) {
+      throw new Error("Không thể tải cài đặt.");
+    }
+    const data = await response.json();
+    return data as SettingsDTO;
+  }, []);
+
+  const loadMonth = useCallback(async (targetMonth: string) => {
+    setTransactions(await fetchMonth(targetMonth));
+  }, [fetchMonth]);
+
   useEffect(() => {
-    loadMonth(month);
-  }, [month]);
+    let ignore = false;
+
+    const loadInitialData = async () => {
+      const [settingsData, billsData] = await Promise.all([fetchSettings(), fetchBills()]);
+      if (ignore) {
+        return;
+      }
+      setSettings(settingsData);
+      setBills(billsData);
+    };
+
+    void loadInitialData();
+
+    return () => {
+      ignore = true;
+    };
+  }, [fetchBills, fetchSettings]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadSelectedMonth = async () => {
+      const items = await fetchMonth(month);
+      if (!ignore) {
+        setTransactions(items);
+      }
+    };
+
+    void loadSelectedMonth();
+
+    return () => {
+      ignore = true;
+    };
+  }, [fetchMonth, month]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, TransactionDTO[]>();
@@ -122,26 +161,39 @@ export default function HomePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: selectedDay, raw }),
     });
+    if (!response.ok) {
+      throw new Error("Không thể thêm giao dịch.");
+    }
     const data = await response.json();
     return data;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardContent className="flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-            <Button variant="outline" size="sm" onClick={() => handleMonthChange(-1)}>
+        <CardContent className="flex flex-col gap-3 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-semibold lg:w-auto">
+            <Button
+              className="w-full px-2 sm:px-3"
+              variant="outline"
+              size="sm"
+              onClick={() => handleMonthChange(-1)}
+            >
               <ChevronLeft className="h-4 w-4" />
-              Prev month
+              Trước
             </Button>
-            <span className="text-base font-semibold">{month}</span>
-            <Button variant="outline" size="sm" onClick={() => handleMonthChange(1)}>
-              Next month
+            <span className="px-2 text-center text-base font-semibold tabular-nums">{month}</span>
+            <Button
+              className="w-full px-2 sm:px-3"
+              variant="outline"
+              size="sm"
+              onClick={() => handleMonthChange(1)}
+            >
+              Sau
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground lg:text-right">
             <span className="font-semibold text-foreground">Kỳ lương:</span> {payrollLabel}
           </div>
         </CardContent>
@@ -168,7 +220,9 @@ export default function HomePage() {
           items={dayItems}
           daySummary={daySummary}
           onQuickAdd={handleQuickAdd}
-          onReload={() => loadMonth(month)}
+          onReload={() => {
+            void loadMonth(month);
+          }}
         />
       </div>
 
