@@ -1,11 +1,13 @@
 import { connectToDatabase } from "@/lib/db/connect";
 import { BillModel } from "@/lib/db/models";
+import type { BillCycleType } from "@/lib/domain/bills";
 
 export type BillPayload = {
   id?: string;
   name: string;
   amount: number;
-  dueDay: number;
+  cycleType: BillCycleType;
+  cycleValue: number;
   group?: string;
   start?: Date | null;
   end?: Date | null;
@@ -32,34 +34,37 @@ const optionalBillFields = (payload: BillPayload) => {
   return { $set, $unset };
 };
 
-export const listBills = async () => {
+export const listBills = async (userId: string) => {
   await connectToDatabase();
-  return BillModel.find().sort({ dueDay: 1 }).lean();
+  return BillModel.find({ userId }).sort({ cycleType: 1, cycleValue: 1 }).lean();
 };
 
-export const upsertBill = async (payload: BillPayload) => {
+export const upsertBill = async (userId: string, payload: BillPayload) => {
   await connectToDatabase();
   if (payload.id) {
     const optional = optionalBillFields(payload);
-    return BillModel.findByIdAndUpdate(
-      payload.id,
+    return BillModel.findOneAndUpdate(
+      { _id: payload.id, userId },
       {
         $set: {
           name: payload.name,
           amount: payload.amount,
-          dueDay: payload.dueDay,
+          cycleType: payload.cycleType,
+          cycleValue: payload.cycleValue,
           ...optional.$set,
         },
-        $unset: optional.$unset,
+        $unset: { dueDay: "", ...optional.$unset },
       },
       { new: true }
     ).lean();
   }
 
   const bill = await BillModel.create({
+    userId,
     name: payload.name,
     amount: payload.amount,
-    dueDay: payload.dueDay,
+    cycleType: payload.cycleType,
+    cycleValue: payload.cycleValue,
     group: payload.group,
     start: payload.start ?? undefined,
     end: payload.end ?? undefined,
@@ -69,10 +74,15 @@ export const upsertBill = async (payload: BillPayload) => {
   return bill.toObject();
 };
 
-export const toggleBillPaid = async (id: string, paid: boolean, paidAt: Date | null) => {
+export const toggleBillPaid = async (
+  userId: string,
+  id: string,
+  paid: boolean,
+  paidAt: Date | null
+) => {
   await connectToDatabase();
-  return BillModel.findByIdAndUpdate(
-    id,
+  return BillModel.findOneAndUpdate(
+    { _id: id, userId },
     paidAt
       ? { $set: { paid, paidAt } }
       : { $set: { paid }, $unset: { paidAt: "", paidAmount: "", paidNote: "" } },
@@ -81,6 +91,7 @@ export const toggleBillPaid = async (id: string, paid: boolean, paidAt: Date | n
 };
 
 export const payBill = async (
+  userId: string,
   id: string,
   paidAt: Date,
   paidAmount?: number,
@@ -105,8 +116,8 @@ export const payBill = async (
     $set.paidNote = paidNote;
   }
 
-  return BillModel.findByIdAndUpdate(
-    id,
+  return BillModel.findOneAndUpdate(
+    { _id: id, userId },
     {
       $set,
       $unset,
@@ -115,16 +126,16 @@ export const payBill = async (
   ).lean();
 };
 
-export const unpayBill = async (id: string) => {
+export const unpayBill = async (userId: string, id: string) => {
   await connectToDatabase();
-  return BillModel.findByIdAndUpdate(
-    id,
+  return BillModel.findOneAndUpdate(
+    { _id: id, userId },
     { $set: { paid: false }, $unset: { paidAt: "", paidAmount: "", paidNote: "" } },
     { new: true }
   ).lean();
 };
 
-export const deleteBillById = async (id: string) => {
+export const deleteBillById = async (userId: string, id: string) => {
   await connectToDatabase();
-  return BillModel.findByIdAndDelete(id).lean();
+  return BillModel.findOneAndDelete({ _id: id, userId }).lean();
 };

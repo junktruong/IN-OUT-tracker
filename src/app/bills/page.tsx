@@ -8,24 +8,48 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { BillCycleType } from "@/lib/domain/bills";
 import type { BillDTO } from "@/lib/types";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN").format(value);
 
+const cycleOptions: Array<{ value: BillCycleType; label: string }> = [
+  { value: "monthly", label: "Hàng tháng" },
+  { value: "weekly", label: "Hàng tuần" },
+  { value: "custom_days", label: "Tuỳ chỉnh" },
+];
+
+const weekdayLabels = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+
+const emptyForm = {
+  name: "",
+  amount: "",
+  cycleType: "monthly" as BillCycleType,
+  cycleValue: "25",
+  group: "",
+  start: "",
+  end: "",
+  note: "",
+};
+
+const cycleLabel = (bill: Pick<BillDTO, "cycleType" | "cycleValue">) => {
+  if (bill.cycleType === "weekly") {
+    return `Hàng tuần • ${weekdayLabels[bill.cycleValue - 1] ?? "Thứ 2"}`;
+  }
+
+  if (bill.cycleType === "custom_days") {
+    return `Mỗi ${bill.cycleValue} ngày`;
+  }
+
+  return `Hàng tháng • ngày ${bill.cycleValue}`;
+};
+
 export default function BillsPage() {
   const [bills, setBills] = useState<BillDTO[]>([]);
   const [filter, setFilter] = useState<"all" | "unpaid">("all");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    amount: "",
-    dueDay: "",
-    group: "",
-    start: "",
-    end: "",
-    note: "",
-  });
+  const [form, setForm] = useState(emptyForm);
   const [payingBill, setPayingBill] = useState<BillDTO | null>(null);
   const [payForm, setPayForm] = useState({
     paidAt: "",
@@ -73,9 +97,17 @@ export default function BillsPage() {
       toast.error("Số tiền phải lớn hơn 0.");
       return;
     }
-    const dueDay = Number(form.dueDay);
-    if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 31) {
-      toast.error("Ngày đóng phải từ 1-31.");
+    const cycleValue = Number(form.cycleValue);
+    if (!Number.isFinite(cycleValue) || cycleValue <= 0) {
+      toast.error("Chu kỳ không hợp lệ.");
+      return;
+    }
+    if (form.cycleType === "monthly" && (cycleValue < 1 || cycleValue > 31)) {
+      toast.error("Ngày đóng hàng tháng phải từ 1-31.");
+      return;
+    }
+    if (form.cycleType === "weekly" && (cycleValue < 1 || cycleValue > 7)) {
+      toast.error("Ngày trong tuần phải hợp lệ.");
       return;
     }
     if (form.start && form.end) {
@@ -94,7 +126,8 @@ export default function BillsPage() {
         id: editingId ?? undefined,
         name: form.name,
         amount,
-        dueDay,
+        cycleType: form.cycleType,
+        cycleValue,
         group: form.group || undefined,
         start: form.start || undefined,
         end: form.end || undefined,
@@ -108,7 +141,7 @@ export default function BillsPage() {
     }
 
     toast.success("Đã lưu khoản đóng.");
-    setForm({ name: "", amount: "", dueDay: "", group: "", start: "", end: "", note: "" });
+    setForm(emptyForm);
     setEditingId(null);
     void loadBills();
   };
@@ -118,7 +151,8 @@ export default function BillsPage() {
     setForm({
       name: bill.name,
       amount: String(bill.amount),
-      dueDay: String(bill.dueDay),
+      cycleType: bill.cycleType,
+      cycleValue: String(bill.cycleValue),
       group: bill.group ?? "",
       start: bill.start ?? "",
       end: bill.end ?? "",
@@ -202,7 +236,7 @@ export default function BillsPage() {
     <div className="space-y-4 sm:space-y-6">
       <Card>
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle>Khoản đóng theo tháng</CardTitle>
+          <CardTitle>Khoản đóng theo chu kỳ</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -219,15 +253,52 @@ export default function BillsPage() {
               value={form.amount}
               onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
             />
-            <Input
-              type="number"
-              min={1}
-              max={31}
-              inputMode="numeric"
-              placeholder="Ngày đến hạn (1-31)"
-              value={form.dueDay}
-              onChange={(event) => setForm((prev) => ({ ...prev, dueDay: event.target.value }))}
-            />
+            <select
+              className="h-10 rounded-lg border border-input/80 bg-background px-3 text-base sm:text-sm"
+              value={form.cycleType}
+              onChange={(event) => {
+                const cycleType = event.target.value as BillCycleType;
+                setForm((prev) => ({
+                  ...prev,
+                  cycleType,
+                  cycleValue:
+                    cycleType === "monthly" ? "25" : cycleType === "weekly" ? "1" : "10",
+                }));
+              }}
+            >
+              {cycleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {form.cycleType === "weekly" ? (
+              <select
+                className="h-10 rounded-lg border border-input/80 bg-background px-3 text-base sm:text-sm"
+                value={form.cycleValue}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, cycleValue: event.target.value }))
+                }
+              >
+                {weekdayLabels.map((label, index) => (
+                  <option key={label} value={String(index + 1)}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                type="number"
+                min={1}
+                max={form.cycleType === "monthly" ? 31 : undefined}
+                inputMode="numeric"
+                placeholder={form.cycleType === "monthly" ? "Ngày trong tháng" : "Số ngày/lần"}
+                value={form.cycleValue}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, cycleValue: event.target.value }))
+                }
+              />
+            )}
             <Input
               placeholder="Nhóm (tuỳ chọn)"
               value={form.group}
@@ -250,6 +321,11 @@ export default function BillsPage() {
               onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
             />
           </div>
+          {form.cycleType === "custom_days" ? (
+            <p className="text-xs text-muted-foreground">
+              Ngày bắt đầu sẽ được dùng làm mốc chu kỳ tuỳ chỉnh.
+            </p>
+          ) : null}
           <Button className="w-full sm:w-auto" onClick={handleSubmit}>Lưu khoản đóng</Button>
         </CardContent>
       </Card>
@@ -278,7 +354,7 @@ export default function BillsPage() {
                     <div className="min-w-0">
                       <p className="break-words text-sm font-semibold">{bill.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        Đến hạn ngày {bill.dueDay} • {formatCurrency(bill.amount)}
+                        {cycleLabel(bill)} • {formatCurrency(bill.amount)}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">

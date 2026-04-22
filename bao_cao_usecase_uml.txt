@@ -1,0 +1,2126 @@
+BAO CAO PHAN TICH USE CASE VA THIET KE UML
+Du an: IN-OUT Tracker - He thong quan ly thu chi ca nhan
+Ngay tong hop: 2026-04-19
+
+MUC LUC
+1. Tong quan he thong
+2. Tac nhan, he thong ben ngoai va pham vi
+3. Chuc nang chinh duoc suy ra tu ma nguon
+4. API va lop du lieu
+5. UML tong quan
+6. Dac ta chi tiet tung use case kem Activity Diagram va Sequence Diagram
+7. Trang thai va rang buoc nghiep vu
+
+============================================================
+1. TONG QUAN HE THONG
+============================================================
+
+IN-OUT Tracker la ung dung web quan ly thu chi ca nhan theo thang/ngay.
+Nguoi dung dang nhap bang Google, sau do co the:
+- Xem dashboard thu, chi, so du rong theo thang va theo ngay.
+- Them giao dich nhanh bang van ban tu do, vi du: "pho 45k; cafe 25k".
+- Cap nhat, xoa giao dich da ghi nhan.
+- Loc va tim kiem giao dich theo loai va tu khoa.
+- Quan ly cac khoan dong/hop dong/hoa don dinh ky theo ngay den han.
+- Xac nhan da dong hoac hoan tac trang thai da dong cua khoan dong.
+- Cau hinh ngay nhan luong va luong du kien.
+- Xem du tru cac khoan can dong trong ky luong hien tai.
+- Xem bieu do phan tich xu huong thu/chi, chi theo danh muc va tong quan thang.
+
+Cong nghe trong ma nguon:
+- Frontend: Next.js App Router, React, TypeScript.
+- UI: Tailwind CSS, cac component Button, Card, Dialog, Tabs, Input, Textarea.
+- Backend: Next.js API Routes.
+- Database: MongoDB thong qua Mongoose.
+- Validation: Zod.
+- Dang nhap: Google OAuth/OpenID Connect thong qua google-auth-library.
+- Bieu do: Recharts.
+- Thong bao: Sonner toast.
+
+Ghi chu pham vi:
+- He thong khong co vai tro admin, khong co chia se du lieu giua nhieu nguoi dung.
+- Du lieu duoc tach theo userId lay tu phien dang nhap Google.
+- He thong khong tich hop ngan hang, vi dien tu hay payment gateway. Viec "da dong" hoa don/khoan dong la ghi nhan thu cong.
+- Tao giao dich moi hien tai duoc thuc hien bang Quick input. Khong thay form tao giao dich thu cong rieng trong UI, nhung co form sua chi tiet giao dich da ton tai.
+
+============================================================
+2. TAC NHAN, HE THONG BEN NGOAI VA PHAM VI
+============================================================
+
+Tac nhan chinh:
+1. Nguoi dung
+   - Ca nhan su dung he thong de theo doi thu chi.
+   - Phai dang nhap Google truoc khi truy cap cac man hinh nghiep vu.
+
+Tac nhan phu/he thong ben ngoai:
+1. Google OAuth/OpenID Provider
+   - Cung cap man hinh dang nhap Google.
+   - Tra ve authorization code va id_token.
+   - Cung cap thong tin dinh danh: googleId, email, name, picture.
+
+2. MongoDB
+   - Luu user, phien nghiep vu dang o dang token cookie da ky, giao dich, khoan dong va cau hinh.
+   - Duoc truy cap qua Mongoose model/repository.
+
+Thanh phan noi bo quan trong:
+- AuthProvider/AuthGate/AuthStatus: quan ly trang thai dang nhap o client.
+- Dashboard page: tai giao dich, khoan dong, cai dat va hien thi tong quan.
+- Bills page: CRUD khoan dong va cap nhat trang thai da dong.
+- Settings page: cap nhat ngay luong va luong du kien.
+- API routes: nhan request, kiem tra session, validate input, goi repository.
+- Domain services: quickParse, payrollWindow, reserveInWindow, analytics.
+- Repository: transactionsRepo, billsRepo, settingsRepo, usersRepo.
+
+============================================================
+3. CHUC NANG CHINH DUOC SUY RA TU MA NGUON
+============================================================
+
+Nhom xac thuc:
+- Dang nhap bang Google.
+- Kiem tra phien hien tai.
+- Dang xuat.
+- Chan truy cap neu chua dang nhap.
+
+Nhom giao dich:
+- Xem giao dich theo thang.
+- Xem tong thu/chi/rong theo ngay va theo thang.
+- Them nhieu giao dich nhanh tu text.
+- Loc giao dich theo loai: tat ca, chi tieu, thu nhap.
+- Tim giao dich theo mo ta, danh muc, nguon, phuong thuc, tai khoan, ghi chu.
+- Xem chi tiet, sua, xoa giao dich.
+
+Nhom khoan dong/hoa don:
+- Xem danh sach khoan dong.
+- Them/sua khoan dong.
+- Xoa khoan dong.
+- Xac nhan da dong voi ngay dong, so tien da dong va ghi chu.
+- Hoan tac trang thai da dong.
+- Loc khoan dong chua dong/tat ca.
+- Tinh cac khoan can dong trong ky luong hien tai.
+
+Nhom cau hinh va phan tich:
+- Xem va cap nhat ngay luong, luong du kien.
+- Tinh ky luong hien tai: tu ngay nhan luong gan nhat den ngay nhan luong tiep theo.
+- Tinh du tru can giu lai truoc luong toi.
+- Bieu do xu huong thu/chi theo ngay trong thang.
+- Bieu do chi tieu theo danh muc.
+- Bieu do tong quan thu/chi.
+
+============================================================
+4. API VA LOP DU LIEU
+============================================================
+
+Bang API chinh:
+
+1. GET /api/auth/me
+   - Muc dich: kiem tra phien dang nhap.
+   - Dau vao: cookie inout_session.
+   - Dau ra: { user } hoac 401 { user: null }.
+
+2. GET /api/auth/google?returnTo=/duong-dan
+   - Muc dich: bat dau dang nhap Google.
+   - Dau vao: returnTo.
+   - Dau ra: redirect sang Google OAuth, set cookie state va returnTo.
+
+3. GET /api/auth/google/callback?code=...&state=...
+   - Muc dich: xu ly callback Google.
+   - Dau vao: code, state, OAuth cookies.
+   - Dau ra: redirect ve returnTo, set cookie session; neu loi redirect /?auth=error.
+
+4. POST /api/auth/logout
+   - Muc dich: dang xuat.
+   - Dau vao: session cookie.
+   - Dau ra: { ok: true }, clear session cookie.
+
+5. GET /api/transactions?month=YYYY-MM
+   - Muc dich: lay giao dich theo thang.
+   - Dau vao: month.
+   - Dau ra: { items: TransactionDTO[] }.
+
+6. POST /api/transactions/quick
+   - Muc dich: them giao dich nhanh tu text.
+   - Dau vao: { date: YYYY-MM-DD, raw: string }.
+   - Dau ra: { added: number, skipped: string[] }.
+
+7. PATCH /api/transactions/:id
+   - Muc dich: sua giao dich.
+   - Dau vao: TransactionInput hop le.
+   - Dau ra: { id } hoac loi 400/401/404.
+
+8. DELETE /api/transactions/:id
+   - Muc dich: xoa giao dich.
+   - Dau vao: transaction id.
+   - Dau ra: { id } hoac loi 401/404.
+
+9. GET /api/bills
+   - Muc dich: lay danh sach khoan dong.
+   - Dau vao: session cookie.
+   - Dau ra: { items: BillDTO[] }.
+
+10. POST /api/bills
+    - Muc dich: them hoac sua khoan dong.
+    - Dau vao: BillInput, neu co id thi sua, khong co id thi them moi.
+    - Dau ra: { id } hoac loi 400/401.
+
+11. DELETE /api/bills/:id
+    - Muc dich: xoa khoan dong.
+    - Dau vao: bill id.
+    - Dau ra: { id } hoac loi 401/404.
+
+12. PATCH /api/bills/:id/pay
+    - Muc dich: xac nhan da dong.
+    - Dau vao: { paidAt: YYYY-MM-DD, paidAmount?: number, paidNote?: string }.
+    - Dau ra: { id } hoac loi 400/401/404.
+
+13. PATCH /api/bills/:id/unpay
+    - Muc dich: hoan tac trang thai da dong.
+    - Dau vao: bill id.
+    - Dau ra: { id } hoac loi 401/404.
+
+14. PATCH /api/bills/:id/paid
+    - Muc dich: toggle trang thai da dong don gian bang boolean.
+    - Dau vao: { paid: boolean }.
+    - Dau ra: { id }. UI hien tai chu yeu dung /pay va /unpay.
+
+15. GET /api/settings
+    - Muc dich: lay cau hinh ky luong cua nguoi dung.
+    - Dau ra: { paydayDay, salaryExpected }. Neu chua co thi tao mac dinh.
+
+16. POST /api/settings
+    - Muc dich: cap nhat cau hinh ky luong.
+    - Dau vao: { paydayDay: 1..31, salaryExpected >= 0 }.
+    - Dau ra: { paydayDay, salaryExpected }.
+
+Bang du lieu chinh:
+
+1. User
+   - googleId: string, unique.
+   - email: string.
+   - name?: string.
+   - picture?: string.
+   - createdAt: Date.
+   - lastLoginAt: Date.
+
+2. Transaction
+   - userId: string.
+   - date: Date.
+   - type: "expense" hoac "income".
+   - amount: number > 0.
+   - category: string.
+   - desc: string.
+   - source?: string.
+   - method?: string.
+   - account?: string.
+   - note?: string.
+   - createdAt: Date.
+
+3. Bill
+   - userId: string.
+   - name: string.
+   - amount: number > 0.
+   - dueDay: number 1..31.
+   - group?: string.
+   - start?: Date.
+   - end?: Date.
+   - note?: string.
+   - paid: boolean.
+   - paidAt?: Date.
+   - paidAmount?: number.
+   - paidNote?: string.
+
+4. Settings
+   - userId: string, unique.
+   - paydayDay: number 1..31, mac dinh 25.
+   - salaryExpected: number >= 0, mac dinh 0.
+
+============================================================
+5. UML TONG QUAN
+============================================================
+
+5.1 Use Case Diagram tong quat
+
+@startuml
+left to right direction
+actor "Nguoi dung" as User
+actor "Google OAuth" as Google <<external>>
+database "MongoDB" as DB <<external storage>>
+
+rectangle "IN-OUT Tracker" {
+  usecase "UC01 Dang nhap Google" as UC01
+  usecase "UC02 Dang xuat" as UC02
+  usecase "UC03 Xem Dashboard" as UC03
+  usecase "UC04 Them giao dich nhanh" as UC04
+  usecase "UC05 Loc/Tim/Xem giao dich" as UC05
+  usecase "UC06 Sua giao dich" as UC06
+  usecase "UC07 Xoa giao dich" as UC07
+  usecase "UC08 Xem phan tich thang" as UC08
+  usecase "UC09 Them/Sua khoan dong" as UC09
+  usecase "UC10 Xoa khoan dong" as UC10
+  usecase "UC11 Xac nhan da dong" as UC11
+  usecase "UC12 Hoan tac da dong" as UC12
+  usecase "UC13 Xem du tru ky luong" as UC13
+  usecase "UC14 Cau hinh ky luong" as UC14
+  usecase "Kiem tra phien dang nhap" as AUTH
+  usecase "Validate du lieu" as VALIDATE
+  usecase "Tinh ky luong" as PAYROLL
+  usecase "Tinh du tru khoan dong" as RESERVE
+  usecase "Phan tich quick input" as QUICK
+}
+
+User --> UC01
+User --> UC02
+User --> UC03
+User --> UC04
+User --> UC05
+User --> UC06
+User --> UC07
+User --> UC08
+User --> UC09
+User --> UC10
+User --> UC11
+User --> UC12
+User --> UC13
+User --> UC14
+
+UC01 --> Google
+UC01 --> DB
+UC03 ..> AUTH : <<include>>
+UC04 ..> AUTH : <<include>>
+UC05 ..> AUTH : <<include>>
+UC06 ..> AUTH : <<include>>
+UC07 ..> AUTH : <<include>>
+UC08 ..> AUTH : <<include>>
+UC09 ..> AUTH : <<include>>
+UC10 ..> AUTH : <<include>>
+UC11 ..> AUTH : <<include>>
+UC12 ..> AUTH : <<include>>
+UC13 ..> AUTH : <<include>>
+UC14 ..> AUTH : <<include>>
+
+UC04 ..> QUICK : <<include>>
+UC04 ..> VALIDATE : <<include>>
+UC06 ..> VALIDATE : <<include>>
+UC09 ..> VALIDATE : <<include>>
+UC11 ..> VALIDATE : <<include>>
+UC14 ..> VALIDATE : <<include>>
+UC13 ..> PAYROLL : <<include>>
+UC13 ..> RESERVE : <<include>>
+
+AUTH --> DB
+UC03 --> DB
+UC04 --> DB
+UC06 --> DB
+UC07 --> DB
+UC09 --> DB
+UC10 --> DB
+UC11 --> DB
+UC12 --> DB
+UC14 --> DB
+@enduml
+
+5.2 Component Diagram tong quan
+
+@startuml
+skinparam componentStyle rectangle
+
+actor "Nguoi dung" as User
+cloud "Google OAuth" as Google
+database "MongoDB" as Mongo
+
+package "Next.js App" {
+  component "AuthProvider\nAuthGate\nAuthStatus" as AuthUI
+  component "Dashboard Page" as Dashboard
+  component "Bills Page" as BillsPage
+  component "Settings Page" as SettingsPage
+  component "API Routes" as Api
+  component "Auth Service\nsession.ts, google.ts" as AuthSvc
+  component "Domain Services\nquickParse, payroll,\nreserve, analytics" as Domain
+  component "Repositories\ntransactionsRepo,\nbillsRepo, settingsRepo,\nusersRepo" as Repo
+  component "Mongoose Models" as Models
+}
+
+User --> AuthUI
+User --> Dashboard
+User --> BillsPage
+User --> SettingsPage
+
+AuthUI --> Api : /api/auth/*
+Dashboard --> Api : /api/transactions, /api/bills, /api/settings
+BillsPage --> Api : /api/bills/*
+SettingsPage --> Api : /api/settings
+
+Api --> AuthSvc : kiem tra/tao/xoa session
+Api --> Domain : validate/tinh toan/phan tich
+Api --> Repo : truy van nghiep vu
+Repo --> Models
+Models --> Mongo
+AuthSvc --> Google : OAuth URL, token verify
+AuthSvc --> Repo : upsert Google user
+@enduml
+
+5.3 Class Diagram tong quan
+
+@startuml
+skinparam classAttributeIconSize 0
+
+class AuthUser {
+  +id: string
+  +email: string
+  +name?: string
+  +picture?: string
+}
+
+class User {
+  +googleId: string
+  +email: string
+  +name?: string
+  +picture?: string
+  +createdAt: Date
+  +lastLoginAt: Date
+}
+
+class SessionService {
+  +createSessionToken(user: AuthUser): string
+  +parseSessionToken(token?: string): AuthUser?
+  +getSessionUserFromRequest(request): AuthUser?
+  +setSessionCookie(response, user): void
+  +clearSessionCookie(response): void
+}
+
+class GoogleAuthService {
+  +getGoogleAuthUrl(requestUrl, state): string
+  +getGoogleUserFromCode(requestUrl, code): AuthUser
+}
+
+class Transaction {
+  +id: string
+  +userId: string
+  +date: Date
+  +type: expense|income
+  +amount: number
+  +category: string
+  +desc: string
+  +source?: string
+  +method?: string
+  +account?: string
+  +note?: string
+  +createdAt: Date
+}
+
+class Bill {
+  +id: string
+  +userId: string
+  +name: string
+  +amount: number
+  +dueDay: number
+  +group?: string
+  +start?: Date
+  +end?: Date
+  +note?: string
+  +paid: boolean
+  +paidAt?: Date
+  +paidAmount?: number
+  +paidNote?: string
+}
+
+class Settings {
+  +userId: string
+  +paydayDay: number
+  +salaryExpected: number
+}
+
+class TransactionRepository {
+  +getTransactionsByMonth(userId, month): Transaction[]
+  +getTransactionsByDay(userId, day): Transaction[]
+  +insertTransactions(userId, items): Transaction[]
+  +updateTransactionById(userId, id, payload): Transaction?
+  +deleteTransactionById(userId, id): Transaction?
+}
+
+class BillRepository {
+  +listBills(userId): Bill[]
+  +upsertBill(userId, payload): Bill?
+  +payBill(userId, id, paidAt, paidAmount?, paidNote?): Bill?
+  +unpayBill(userId, id): Bill?
+  +toggleBillPaid(userId, id, paid, paidAt): Bill?
+  +deleteBillById(userId, id): Bill?
+}
+
+class SettingsRepository {
+  +getSettings(userId): Settings
+  +updateSettings(userId, payload): Settings
+}
+
+class UserRepository {
+  +upsertGoogleUser(user: AuthUser): User
+}
+
+class QuickParser {
+  +quickParse(raw): ParsedTxResult
+}
+
+class PayrollService {
+  +payrollWindow(today, paydayDay): PayrollWindow
+}
+
+class ReserveService {
+  +reserveInWindow(bills, window): ReserveResult
+}
+
+class AnalyticsService {
+  +groupByDaySeries(monthKey, transactions): DaySeriesPoint[]
+  +expenseByCategory(transactions): CategoryAmount[]
+  +topCategories(list, limit): CategoryAmount[]
+}
+
+User "1" -- "0..*" Transaction : logical userId
+User "1" -- "0..*" Bill : logical userId
+User "1" -- "0..1" Settings : logical userId
+AuthUser ..> User : du lieu tu Google
+SessionService ..> AuthUser
+GoogleAuthService ..> AuthUser
+UserRepository ..> User
+TransactionRepository ..> Transaction
+BillRepository ..> Bill
+SettingsRepository ..> Settings
+QuickParser ..> Transaction : tao ParsedTx
+PayrollService ..> Settings : paydayDay
+ReserveService ..> Bill
+ReserveService ..> PayrollService
+AnalyticsService ..> Transaction
+@enduml
+
+5.4 Database / ER Diagram
+
+@startuml
+hide circle
+skinparam linetype ortho
+
+entity "users" as users {
+  * _id : ObjectId
+  --
+  * googleId : string <<unique,index>>
+  * email : string <<index>>
+  name : string
+  picture : string
+  createdAt : Date
+  lastLoginAt : Date
+}
+
+entity "transactions" as transactions {
+  * _id : ObjectId
+  --
+  * userId : string <<index>>
+  * date : Date <<index>>
+  * type : string expense|income
+  * amount : number
+  * category : string
+  * desc : string
+  source : string
+  method : string
+  account : string
+  note : string
+  createdAt : Date
+}
+
+entity "bills" as bills {
+  * _id : ObjectId
+  --
+  * userId : string <<index>>
+  * name : string
+  * amount : number
+  * dueDay : number <<index>>
+  group : string
+  start : Date
+  end : Date
+  note : string
+  paid : boolean
+  paidAt : Date
+  paidAmount : number
+  paidNote : string
+}
+
+entity "settings" as settings {
+  * _id : ObjectId
+  --
+  * userId : string <<unique,index>>
+  paydayDay : number
+  salaryExpected : number
+}
+
+users ||--o{ transactions : "logical: users.googleId = transactions.userId"
+users ||--o{ bills : "logical: users.googleId = bills.userId"
+users ||--o| settings : "logical: users.googleId = settings.userId"
+@enduml
+
+5.5 Deployment Diagram rut gon
+
+@startuml
+node "Trinh duyet nguoi dung" as Browser {
+  artifact "React UI"
+}
+
+node "Next.js Server" as Server {
+  artifact "App Router Pages"
+  artifact "API Routes"
+  artifact "Domain Services"
+  artifact "Repositories"
+}
+
+cloud "Google OAuth" as Google
+database "MongoDB" as Mongo
+
+Browser --> Server : HTTPS fetch/navigation
+Server --> Google : OAuth authorize/token/verify
+Server --> Mongo : Mongoose queries
+@enduml
+
+============================================================
+6. DAC TA CHI TIET TUNG USE CASE
+============================================================
+
+------------------------------------------------------------
+UC01 - Dang nhap bang Google
+------------------------------------------------------------
+
+Muc tieu:
+- Cho phep nguoi dung xac thuc bang tai khoan Google va tao phien su dung he thong.
+
+Tac nhan chinh:
+- Nguoi dung.
+
+Tac nhan phu/ben thu ba:
+- Google OAuth/OpenID Provider.
+- MongoDB luu hoac cap nhat user.
+
+Tien dieu kien:
+- GOOGLE_CLIENT_ID va GOOGLE_CLIENT_SECRET duoc cau hinh.
+- AUTH_SECRET hoac GOOGLE_CLIENT_SECRET co the dung de ky session.
+
+Kich hoat:
+- Nguoi dung bam "Dang nhap" hoac bi AuthGate yeu cau dang nhap.
+
+Du lieu vao:
+- returnTo: duong dan muon quay lai sau khi dang nhap.
+- Google authorization code va state o callback.
+
+Luong chinh:
+1. Nguoi dung bam Dang nhap.
+2. He thong tao state ngau nhien, luu state va returnTo vao cookie tam thoi.
+3. He thong redirect sang Google OAuth.
+4. Nguoi dung chon tai khoan Google va cap quyen.
+5. Google redirect ve /api/auth/google/callback voi code va state.
+6. He thong so sanh state trong request voi state trong cookie.
+7. He thong doi code lay token va verify id_token.
+8. He thong lay googleId, email, name, picture.
+9. He thong upsert User vao MongoDB.
+10. He thong tao session token da ky va set cookie inout_session.
+11. He thong xoa cookie OAuth tam thoi va redirect ve returnTo.
+
+Luong thay the/ngoai le:
+- Sai/thieu code hoac state: redirect ve /?auth=error.
+- Google khong tra id_token hoac email chua xac minh: redirect ve /?auth=error.
+- Thieu bien moi truong Google: login that bai.
+
+Dau ra/hau dieu kien:
+- User duoc luu/cap nhat trong collection users.
+- Cookie inout_session duoc set, thoi han 30 ngay.
+- Nguoi dung co the truy cap cac chuc nang can xac thuc.
+
+Phu thuoc:
+- GoogleAuthService, SessionService, UserRepository, MongoDB.
+
+API/lop lien quan:
+- GET /api/auth/google
+- GET /api/auth/google/callback
+- src/lib/auth/google.ts
+- src/lib/auth/session.ts
+- src/lib/repo/usersRepo.ts
+
+Activity Diagram:
+@startuml
+start
+:Nguoi dung bam Dang nhap;
+:Tao OAuth state;
+:Luu state va returnTo vao cookie;
+:Redirect sang Google OAuth;
+:Nguoi dung xac thuc tren Google;
+:Google redirect ve callback;
+if (code/state hop le?) then (Co)
+  :Doi code lay token;
+  :Verify id_token;
+  if (Thong tin Google hop le?) then (Co)
+    :Upsert user vao MongoDB;
+    :Tao session token da ky;
+    :Set session cookie;
+    :Xoa OAuth cookies;
+    :Redirect ve returnTo;
+  else (Khong)
+    :Redirect /?auth=error;
+  endif
+else (Khong)
+  :Redirect /?auth=error;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Auth UI" as UI
+participant "GET /api/auth/google" as StartApi
+participant "Google OAuth" as Google
+participant "GET /api/auth/google/callback" as Callback
+participant "SessionService" as Session
+participant "UserRepository" as UserRepo
+database "MongoDB" as DB
+
+User -> UI : Bam Dang nhap
+UI -> StartApi : GET returnTo
+StartApi -> Session : setOAuthCookie(state, returnTo)
+StartApi -> Google : Redirect authorize URL
+Google -> User : Man hinh chon tai khoan
+User -> Google : Xac nhan
+Google -> Callback : Redirect code,state
+Callback -> Session : Doc va so sanh state
+Callback -> Google : Doi code va verify id_token
+Google --> Callback : AuthUser
+Callback -> UserRepo : upsertGoogleUser(AuthUser)
+UserRepo -> DB : findOneAndUpdate upsert
+DB --> UserRepo : User
+Callback -> Session : setSessionCookie(AuthUser)
+Callback --> User : Redirect ve returnTo
+@enduml
+
+------------------------------------------------------------
+UC02 - Dang xuat
+------------------------------------------------------------
+
+Muc tieu:
+- Ket thuc phien dang nhap tren trinh duyet hien tai.
+
+Tac nhan chinh:
+- Nguoi dung.
+
+Tac nhan phu/ben thu ba:
+- Khong co dich vu ben ngoai. He thong chi xoa cookie phien.
+
+Tien dieu kien:
+- Nguoi dung dang co session hoac UI dang hien trang thai da dang nhap.
+
+Kich hoat:
+- Nguoi dung bam "Dang xuat".
+
+Du lieu vao:
+- Cookie inout_session hien tai.
+
+Luong chinh:
+1. Nguoi dung bam Dang xuat.
+2. AuthProvider goi POST /api/auth/logout.
+3. API tra { ok: true } va set cookie inout_session rong voi maxAge = 0.
+4. Client set user = null.
+5. AuthGate hien lai man hinh yeu cau dang nhap.
+
+Luong thay the/ngoai le:
+- Neu request that bai, UI van co the can refresh lai trang de doc lai session.
+
+Dau ra/hau dieu kien:
+- Session cookie bi xoa.
+- Nguoi dung khong con truy cap duoc dashboard/bills/settings neu chua dang nhap lai.
+
+Phu thuoc:
+- SessionService, AuthProvider.
+
+API/lop lien quan:
+- POST /api/auth/logout
+- src/components/auth/AuthProvider.tsx
+- src/lib/auth/session.ts
+
+Activity Diagram:
+@startuml
+start
+:Nguoi dung bam Dang xuat;
+:Client goi POST /api/auth/logout;
+:Server clear session cookie;
+:Server tra {ok:true};
+:Client dat user = null;
+:AuthGate hien man hinh dang nhap;
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "AuthStatus" as Status
+participant "AuthProvider" as Provider
+participant "POST /api/auth/logout" as LogoutApi
+participant "SessionService" as Session
+
+User -> Status : Bam Dang xuat
+Status -> Provider : signOut()
+Provider -> LogoutApi : POST
+LogoutApi -> Session : clearSessionCookie(response)
+LogoutApi --> Provider : {ok:true}
+Provider --> Status : user = null
+@enduml
+
+------------------------------------------------------------
+UC03 - Xem Dashboard theo thang/ngay
+------------------------------------------------------------
+
+Muc tieu:
+- Hien thi lich thang, tong thu/chi/rong, danh sach giao dich cua ngay duoc chon, cac khoan can dong trong ky luong.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB luu transaction, bill, settings.
+
+Tien dieu kien:
+- Session hop le.
+- Neu settings chua co, he thong tao settings mac dinh paydayDay = 25, salaryExpected = 0.
+
+Kich hoat:
+- Nguoi dung mo trang Dashboard "/" hoac chuyen thang.
+
+Du lieu vao:
+- Month key YYYY-MM.
+- Selected day YYYY-MM-DD.
+- Cookie inout_session.
+
+Luong chinh:
+1. AuthGate kiem tra session qua /api/auth/me.
+2. Dashboard goi /api/settings va /api/bills de lay cau hinh, khoan dong.
+3. Dashboard goi /api/transactions?month=YYYY-MM de lay giao dich thang.
+4. He thong gom giao dich theo ngay.
+5. He thong tinh tong thu, tong chi, rong cho thang.
+6. He thong tinh tong thu, tong chi, rong cho ngay dang chon.
+7. He thong tinh payrollWindow tu ngay hien tai va paydayDay.
+8. He thong tinh reserveInWindow tu danh sach bills va payrollWindow.
+9. UI hien CalendarMonth, SummaryCards, BillsInWindow, DayPanel, AnalyticsSection.
+
+Luong thay the/ngoai le:
+- Chua dang nhap: AuthGate hien form dang nhap.
+- month khong dung YYYY-MM: API tra 400.
+- Loi tai du lieu: UI throw error, can co co che error boundary neu muon hien than thien hon.
+
+Dau ra/hau dieu kien:
+- Dashboard hien du lieu ca nhan cua user theo thang dang chon.
+- Khong lam thay doi du lieu trong database, tru khi settings mac dinh duoc tao lan dau.
+
+Phu thuoc:
+- AuthGate, transactionsRepo, billsRepo, settingsRepo, payrollWindow, reserveInWindow, analytics.
+
+API/lop lien quan:
+- GET /api/auth/me
+- GET /api/transactions?month=YYYY-MM
+- GET /api/bills
+- GET /api/settings
+- src/app/page.tsx
+
+Activity Diagram:
+@startuml
+start
+:Mo Dashboard;
+:AuthGate kiem tra dang nhap;
+if (Da dang nhap?) then (Co)
+  fork
+    :Tai settings;
+  fork again
+    :Tai bills;
+  fork again
+    :Tai transactions theo thang;
+  end fork
+  :Gom giao dich theo ngay;
+  :Tinh tong thang va tong ngay;
+  :Tinh ky luong hien tai;
+  :Tinh khoan can du tru;
+  :Render dashboard;
+else (Khong)
+  :Hien man hinh dang nhap;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Dashboard Page" as UI
+participant "AuthGate/AuthProvider" as AuthUI
+participant "GET /api/auth/me" as MeApi
+participant "GET /api/settings" as SettingsApi
+participant "GET /api/bills" as BillsApi
+participant "GET /api/transactions" as TxApi
+participant "Domain Services" as Domain
+database "MongoDB" as DB
+
+User -> UI : Mo /
+UI -> AuthUI : render
+AuthUI -> MeApi : GET
+MeApi --> AuthUI : user
+UI -> SettingsApi : GET
+SettingsApi -> DB : find/create Settings
+DB --> SettingsApi : SettingsDTO
+UI -> BillsApi : GET
+BillsApi -> DB : find bills by userId
+DB --> BillsApi : BillDTO[]
+UI -> TxApi : GET month
+TxApi -> DB : find transactions by userId,date range
+DB --> TxApi : TransactionDTO[]
+UI -> Domain : payrollWindow, reserveInWindow, analytics
+UI --> User : Dashboard da tinh toan
+@enduml
+
+------------------------------------------------------------
+UC04 - Them giao dich nhanh bang Quick input
+------------------------------------------------------------
+
+Muc tieu:
+- Ghi nhan mot hoac nhieu giao dich trong ngay duoc chon tu text nhap nhanh.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB luu giao dich.
+- Khong co ben thu ba nghiep vu.
+
+Tien dieu kien:
+- Session hop le.
+- Nguoi dung dang o Dashboard va chon mot ngay.
+
+Kich hoat:
+- Nguoi dung nhap text vao Quick input va bam "Them".
+
+Du lieu vao:
+- date: YYYY-MM-DD cua ngay dang chon.
+- raw: chuoi co the gom nhieu dong, ngan cach bang xuong dong, dau ";" hoac "；".
+- Quy tac parse:
+  + Mac dinh la expense.
+  + Bat dau bang "+" hoac "thu:" la income.
+  + "[Danh muc]" o dau dong chi dinh category.
+  + "@Nguon" o cuoi dong chi dinh source.
+  + So tien co the co "k", vi du 45k = 45000.
+
+Luong chinh:
+1. Nguoi dung nhap raw text.
+2. Client kiem tra raw khong rong.
+3. Client goi POST /api/transactions/quick voi date va raw.
+4. API kiem tra session.
+5. API validate date va raw bang Zod.
+6. quickParse tach raw thanh cac dong giao dich.
+7. Cac dong co so tien hop le duoc chuyen thanh ParsedTx.
+8. Cac dong khong parse duoc duoc dua vao skipped.
+9. Neu co item hop le, insertTransactions luu vao MongoDB voi userId va date da normalize.
+10. API tra so dong added va skipped.
+11. UI hien toast va reload giao dich thang.
+
+Luong thay the/ngoai le:
+- Raw rong: UI hien loi "Vui long nhap noi dung".
+- Date/raw khong hop le: API tra 400.
+- Chua dang nhap: API tra 401.
+- Tat ca dong bi skip: API tra added = 0, skipped gom cac dong loi, khong insert database.
+
+Dau ra/hau dieu kien:
+- Giao dich hop le duoc them vao collection transactions.
+- Dashboard cap nhat lai tong ngay/thang va bieu do.
+
+Phu thuoc:
+- transaction date trong UI, quickParse, insertTransactions, MongoDB.
+
+API/lop lien quan:
+- POST /api/transactions/quick
+- src/lib/domain/quickParse.ts
+- src/lib/repo/transactionsRepo.ts
+- src/components/dashboard/DayPanel.tsx
+
+Activity Diagram:
+@startuml
+start
+:Nhap raw Quick input;
+if (raw rong?) then (Co)
+  :Hien loi tren UI;
+  stop
+else (Khong)
+  :POST /api/transactions/quick;
+endif
+:Kiem tra session;
+if (Session hop le?) then (Co)
+  :Validate date va raw;
+  if (Hop le?) then (Co)
+    :quickParse raw;
+    if (Co item parse duoc?) then (Co)
+      :Insert giao dich vao MongoDB;
+    else (Khong)
+      :Khong insert;
+    endif
+    :Tra added va skipped;
+    :UI hien toast va reload thang;
+  else (Khong)
+    :Tra 400;
+  endif
+else (Khong)
+  :Tra 401;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "DayPanel" as UI
+participant "POST /api/transactions/quick" as Api
+participant "SessionService" as Session
+participant "quickParse" as Parser
+participant "TransactionRepository" as Repo
+database "MongoDB" as DB
+participant "Dashboard" as Dashboard
+
+User -> UI : Nhap raw va bam Them
+UI -> Api : POST {date, raw}
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Parser : quickParse(raw)
+Parser --> Api : {items, skipped}
+alt items.length > 0
+  Api -> Repo : insertTransactions(userId, items)
+  Repo -> DB : insertMany
+  DB --> Repo : inserted docs
+end
+Api --> UI : {added, skipped}
+UI -> Dashboard : onReload()
+Dashboard -> Api : GET /api/transactions?month=...
+@enduml
+
+------------------------------------------------------------
+UC05 - Loc, tim kiem va xem chi tiet giao dich trong ngay
+------------------------------------------------------------
+
+Muc tieu:
+- Cho phep nguoi dung xem cac giao dich cua ngay da chon, loc theo loai va tim nhanh theo tu khoa.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB chi duoc truy van o buoc tai du lieu dashboard. Loc/tim trong ngay thuc hien tren client.
+
+Tien dieu kien:
+- Dashboard da tai giao dich cua thang.
+
+Kich hoat:
+- Nguoi dung chon ngay tren calendar, chon filter hoac nhap tu khoa.
+
+Du lieu vao:
+- selectedDay.
+- filter: all | expense | income.
+- keyword: chuoi tim kiem.
+
+Luong chinh:
+1. Nguoi dung chon mot ngay tren CalendarMonth.
+2. Dashboard lay items cua selectedDay tu map byDay.
+3. DayPanel sap xep items theo createdAt.
+4. Nguoi dung chon filter.
+5. DayPanel chi giu giao dich co type phu hop.
+6. Nguoi dung nhap keyword.
+7. DayPanel tim trong desc, category, source, method, account, note.
+8. UI hien danh sach giao dich va nut "Xem/Sua".
+9. Neu bam "Xem/Sua", dialog chi tiet giao dich mo ra.
+
+Luong thay the/ngoai le:
+- Ngay khong co giao dich: danh sach trong.
+- Keyword khong khop: danh sach trong.
+
+Dau ra/hau dieu kien:
+- Khong thay doi database.
+- Nguoi dung co the tiep tuc sua hoac xoa giao dich tu dialog.
+
+Phu thuoc:
+- Dashboard transactions state, CalendarMonth, DayPanel.
+
+API/lop lien quan:
+- GET /api/transactions?month=YYYY-MM de tai du lieu ban dau.
+- src/components/dashboard/DayPanel.tsx
+- src/components/dashboard/CalendarMonth.tsx
+
+Activity Diagram:
+@startuml
+start
+:Chon ngay tren calendar;
+:Lay giao dich cua selectedDay;
+:Sap xep theo createdAt;
+:Nguoi dung chon filter;
+if (filter != all?) then (Co)
+  :Loc theo type;
+endif
+:Nguoi dung nhap keyword;
+if (keyword co gia tri?) then (Co)
+  :Tim trong desc/category/source/method/account/note;
+endif
+:Hien danh sach ket qua;
+if (Bam Xem/Sua?) then (Co)
+  :Mo dialog chi tiet giao dich;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "CalendarMonth" as Calendar
+participant "Dashboard State" as State
+participant "DayPanel" as DayPanel
+
+User -> Calendar : Chon ngay
+Calendar -> State : setSelectedDay(dayKey)
+State -> DayPanel : items cua ngay
+DayPanel -> DayPanel : sort by createdAt
+User -> DayPanel : Chon filter
+DayPanel -> DayPanel : Loc theo type
+User -> DayPanel : Nhap keyword
+DayPanel -> DayPanel : Tim trong cac field text
+DayPanel --> User : Danh sach giao dich
+User -> DayPanel : Bam Xem/Sua
+DayPanel --> User : Dialog chi tiet
+@enduml
+
+------------------------------------------------------------
+UC06 - Sua giao dich
+------------------------------------------------------------
+
+Muc tieu:
+- Cap nhat thong tin cua mot giao dich da ghi nhan.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB luu giao dich.
+
+Tien dieu kien:
+- Giao dich ton tai va thuoc user dang dang nhap.
+- Dialog chi tiet giao dich da duoc mo.
+
+Kich hoat:
+- Nguoi dung sua form va bam "Luu".
+
+Du lieu vao:
+- date: YYYY-MM-DD.
+- type: expense | income.
+- amount: number > 0.
+- category: string.
+- desc: string.
+- source/method/account/note: tuy chon.
+
+Luong chinh:
+1. Nguoi dung sua cac truong trong dialog.
+2. UI tao payload va validate bang transactionSchema.
+3. UI goi PATCH /api/transactions/:id.
+4. API kiem tra session.
+5. API validate payload bang transactionSchema.
+6. Repo update transaction theo dieu kien _id va userId.
+7. Neu tim thay, MongoDB cap nhat date da normalize va cac truong giao dich.
+8. API tra { id }.
+9. UI dong dialog, hien toast thanh cong va reload giao dich thang.
+
+Luong thay the/ngoai le:
+- Payload khong hop le: UI hoac API bao loi.
+- Chua dang nhap: API tra 401.
+- id khong ton tai hoac khong thuoc user: API tra 404.
+
+Dau ra/hau dieu kien:
+- Giao dich duoc cap nhat.
+- Tong ngay/thang va bieu do duoc tinh lai sau khi reload.
+
+Phu thuoc:
+- transactionSchema, updateTransactionById, MongoDB.
+
+API/lop lien quan:
+- PATCH /api/transactions/:id
+- src/lib/domain/transactions.ts
+- src/lib/repo/transactionsRepo.ts
+- src/components/dashboard/DayPanel.tsx
+
+Activity Diagram:
+@startuml
+start
+:Mo dialog chi tiet giao dich;
+:Sua cac truong;
+:Bam Luu;
+:UI validate transactionSchema;
+if (Hop le?) then (Co)
+  :PATCH /api/transactions/:id;
+  :API kiem tra session;
+  if (Session hop le?) then (Co)
+    :API validate payload;
+    :Update theo _id va userId;
+    if (Tim thay giao dich?) then (Co)
+      :Tra {id};
+      :UI dong dialog va reload;
+    else (Khong)
+      :Tra 404;
+    endif
+  else (Khong)
+    :Tra 401;
+  endif
+else (Khong)
+  :Hien loi nhap lieu;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "DayPanel Dialog" as UI
+participant "PATCH /api/transactions/:id" as Api
+participant "SessionService" as Session
+participant "transactionSchema" as Schema
+participant "TransactionRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Sua form va bam Luu
+UI -> Schema : safeParse(payload)
+Schema --> UI : ok
+UI -> Api : PATCH payload
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Schema : safeParse(body)
+Schema --> Api : ok
+Api -> Repo : updateTransactionById(userId,id,payload)
+Repo -> DB : findOneAndUpdate({_id,id,userId})
+DB --> Repo : updated doc hoac null
+Repo --> Api : result
+Api --> UI : {id} hoac 404
+UI --> User : Toast va reload
+@enduml
+
+------------------------------------------------------------
+UC07 - Xoa giao dich
+------------------------------------------------------------
+
+Muc tieu:
+- Xoa mot giao dich khong con dung.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB.
+
+Tien dieu kien:
+- Giao dich ton tai va thuoc user dang dang nhap.
+- Dialog chi tiet giao dich dang mo.
+
+Kich hoat:
+- Nguoi dung nhap "DELETE" vao o xac nhan va bam "Xoa".
+
+Du lieu vao:
+- transaction id.
+- confirmText = "DELETE" o client.
+
+Luong chinh:
+1. Nguoi dung nhap DELETE.
+2. Nguoi dung bam Xoa.
+3. UI kiem tra confirmText dung DELETE.
+4. UI goi DELETE /api/transactions/:id.
+5. API kiem tra session.
+6. Repo xoa transaction theo _id va userId.
+7. API tra { id }.
+8. UI dong dialog, hien toast thanh cong va reload giao dich thang.
+
+Luong thay the/ngoai le:
+- confirmText khac DELETE: UI bao loi, khong goi API.
+- Chua dang nhap: API tra 401.
+- id khong ton tai hoac khong thuoc user: API tra 404.
+
+Dau ra/hau dieu kien:
+- Giao dich bi xoa khoi database.
+- Dashboard cap nhat lai tong ngay/thang.
+
+Phu thuoc:
+- deleteTransactionById, MongoDB.
+
+API/lop lien quan:
+- DELETE /api/transactions/:id
+- src/lib/repo/transactionsRepo.ts
+
+Activity Diagram:
+@startuml
+start
+:Mo dialog chi tiet;
+:Nhap chuoi xac nhan;
+:Bam Xoa;
+if (confirmText == DELETE?) then (Co)
+  :DELETE /api/transactions/:id;
+  :Kiem tra session;
+  if (Session hop le?) then (Co)
+    :Xoa theo _id va userId;
+    if (Tim thay?) then (Co)
+      :Tra {id};
+      :Reload dashboard;
+    else (Khong)
+      :Tra 404;
+    endif
+  else (Khong)
+    :Tra 401;
+  endif
+else (Khong)
+  :Hien loi yeu cau nhap DELETE;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "DayPanel Dialog" as UI
+participant "DELETE /api/transactions/:id" as Api
+participant "SessionService" as Session
+participant "TransactionRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Nhap DELETE va bam Xoa
+UI -> UI : Kiem tra confirmText
+UI -> Api : DELETE
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Repo : deleteTransactionById(userId,id)
+Repo -> DB : findOneAndDelete({_id,id,userId})
+DB --> Repo : removed doc hoac null
+Repo --> Api : result
+Api --> UI : {id} hoac 404
+UI --> User : Toast va reload
+@enduml
+
+------------------------------------------------------------
+UC08 - Xem phan tich thu chi theo thang
+------------------------------------------------------------
+
+Muc tieu:
+- Giup nguoi dung nhin xu huong va co cau chi tieu trong thang.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB cung cap transaction.
+- Recharts la thu vien ve bieu do, khong phai dich vu ben ngoai.
+
+Tien dieu kien:
+- Dashboard da tai transaction cua thang.
+
+Kich hoat:
+- Nguoi dung mo Dashboard hoac chuyen tab trong khu vuc "Phan tich thang".
+
+Du lieu vao:
+- monthKey YYYY-MM.
+- transactions cua thang.
+- monthSummary da tinh.
+
+Luong chinh:
+1. Dashboard truyen monthKey, transactions, monthSummary vao AnalyticsSection.
+2. groupByDaySeries tao series tung ngay trong thang voi income/expense.
+3. expenseByCategory gom chi tieu theo category.
+4. topCategories sap xep top danh muc, gom phan con lai vao "Khac".
+5. UI hien tab Xu huong bang AreaChart.
+6. UI hien tab Danh muc bang BarChart.
+7. UI hien tab Tong quan bang PieChart va cac so thu/chi/rong.
+
+Luong thay the/ngoai le:
+- Khong co transaction: hien thong bao chua co du lieu.
+- Khong co expense: tab Danh muc hien "Chua co giao dich chi tieu trong thang".
+
+Dau ra/hau dieu kien:
+- Khong thay doi database.
+- Nguoi dung nhin duoc thong tin phan tich truc quan.
+
+Phu thuoc:
+- analytics domain functions, Recharts, TransactionDTO.
+
+API/lop lien quan:
+- GET /api/transactions?month=YYYY-MM
+- src/lib/domain/analytics.ts
+- src/components/dashboard/AnalyticsSection.tsx
+
+Activity Diagram:
+@startuml
+start
+:Nhan transactions va monthSummary;
+:groupByDaySeries;
+:expenseByCategory;
+:topCategories;
+if (Nguoi dung chon tab Xu huong?) then (Co)
+  :Render AreaChart thu/chi tung ngay;
+elseif (Chon tab Danh muc?) then (Co)
+  if (Co expense?) then (Co)
+    :Render BarChart theo category;
+  else (Khong)
+    :Hien thong bao chua co chi tieu;
+  endif
+else (Tong quan)
+  if (Co thu hoac chi?) then (Co)
+    :Render PieChart va so tong;
+  else (Khong)
+    :Hien thong bao chua co du lieu;
+  endif
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Dashboard" as Dashboard
+participant "AnalyticsSection" as AnalyticsUI
+participant "AnalyticsService" as Analytics
+participant "Recharts" as Charts
+
+User -> Dashboard : Mo dashboard/chuyen thang
+Dashboard -> AnalyticsUI : props monthKey, transactions, summary
+AnalyticsUI -> Analytics : groupByDaySeries()
+Analytics --> AnalyticsUI : trendSeries
+AnalyticsUI -> Analytics : expenseByCategory()
+AnalyticsUI -> Analytics : topCategories()
+Analytics --> AnalyticsUI : categorySeries
+User -> AnalyticsUI : Chon tab
+AnalyticsUI -> Charts : Render chart tu series
+Charts --> User : Bieu do
+@enduml
+
+------------------------------------------------------------
+UC09 - Them hoac sua khoan dong/hoa don
+------------------------------------------------------------
+
+Muc tieu:
+- Quan ly cac khoan dong dinh ky nhu tien nha, dien, internet, hoc phi.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB.
+
+Tien dieu kien:
+- Session hop le.
+- Neu sua, khoan dong phai ton tai va thuoc user dang dang nhap.
+
+Kich hoat:
+- Nguoi dung mo trang /bills, nhap form va bam "Luu khoan dong".
+- Neu sua, nguoi dung bam "Sua" tren mot khoan dong truoc do.
+
+Du lieu vao:
+- name: bat buoc.
+- amount: number > 0.
+- dueDay: so nguyen 1..31.
+- group: tuy chon.
+- start: tuy chon.
+- end: tuy chon.
+- note: tuy chon.
+- id: tuy chon, co id thi update, khong co id thi create.
+
+Luong chinh:
+1. Trang Bills tai danh sach bills hien tai.
+2. Nguoi dung nhap form them moi hoac bam Sua de do du lieu cu vao form.
+3. UI validate name, amount, dueDay, start <= end.
+4. UI goi POST /api/bills.
+5. API kiem tra session.
+6. API validate billSchema.
+7. Neu co id, repo update bill theo _id va userId.
+8. Neu khong co id, repo create bill moi voi userId.
+9. API tra { id }.
+10. UI reset form, hien toast va tai lai danh sach.
+
+Luong thay the/ngoai le:
+- Thieu name: UI bao loi.
+- amount <= 0 hoac dueDay ngoai 1..31: UI/API bao loi.
+- start > end: UI/API bao loi.
+- Chua dang nhap: API tra 401.
+
+Dau ra/hau dieu kien:
+- Khoan dong moi duoc tao hoac khoan dong cu duoc cap nhat.
+- Danh sach bills va du tru dashboard se thay doi sau khi reload.
+
+Phu thuoc:
+- billSchema, upsertBill, MongoDB.
+
+API/lop lien quan:
+- GET /api/bills
+- POST /api/bills
+- src/lib/domain/bills.ts
+- src/lib/repo/billsRepo.ts
+- src/app/bills/page.tsx
+
+Activity Diagram:
+@startuml
+start
+:Mo trang Khoan dong;
+:Tai danh sach bills;
+if (Nguoi dung bam Sua?) then (Co)
+  :Do du lieu bill vao form;
+else (Khong)
+  :Nhap form moi;
+endif
+:Bam Luu khoan dong;
+:UI validate name/amount/dueDay/start-end;
+if (Hop le?) then (Co)
+  :POST /api/bills;
+  :API kiem tra session;
+  :API validate billSchema;
+  if (Co id?) then (Sua)
+    :Update bill theo _id va userId;
+  else (Them)
+    :Create bill voi userId;
+  endif
+  :Tra {id};
+  :Reset form va reload bills;
+else (Khong)
+  :Hien loi nhap lieu;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Bills Page" as UI
+participant "POST /api/bills" as Api
+participant "SessionService" as Session
+participant "billSchema" as Schema
+participant "BillRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Nhap/sua form va bam Luu
+UI -> UI : Validate co ban
+UI -> Api : POST BillInput
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Schema : safeParse(body)
+Schema --> Api : ok
+alt payload co id
+  Api -> Repo : upsertBill(userId,payload)
+  Repo -> DB : findOneAndUpdate({_id,id,userId})
+else payload khong co id
+  Api -> Repo : upsertBill(userId,payload)
+  Repo -> DB : create bill
+end
+DB --> Repo : bill
+Repo --> Api : result
+Api --> UI : {id}
+UI -> Api : GET /api/bills
+UI --> User : Danh sach moi
+@enduml
+
+------------------------------------------------------------
+UC10 - Xoa khoan dong/hoa don
+------------------------------------------------------------
+
+Muc tieu:
+- Loai bo mot khoan dong khong con can theo doi.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB.
+
+Tien dieu kien:
+- Khoan dong ton tai va thuoc user dang dang nhap.
+
+Kich hoat:
+- Nguoi dung bam "Xoa" tren mot bill va xac nhan confirm cua trinh duyet.
+
+Du lieu vao:
+- bill id.
+- ket qua window.confirm.
+
+Luong chinh:
+1. Nguoi dung bam Xoa.
+2. UI hien confirm "Xoa khoan dong ...?".
+3. Nguoi dung dong y.
+4. UI goi DELETE /api/bills/:id.
+5. API kiem tra session.
+6. Repo xoa bill theo _id va userId.
+7. API tra { id }.
+8. UI hien toast va tai lai danh sach bills.
+
+Luong thay the/ngoai le:
+- Nguoi dung huy confirm: ket thuc, khong goi API.
+- Chua dang nhap: API tra 401.
+- Bill khong ton tai/khong thuoc user: API tra 404.
+
+Dau ra/hau dieu kien:
+- Khoan dong bi xoa.
+- Dashboard khong con tinh khoan nay trong du tru.
+
+Phu thuoc:
+- deleteBillById, MongoDB.
+
+API/lop lien quan:
+- DELETE /api/bills/:id
+- src/lib/repo/billsRepo.ts
+
+Activity Diagram:
+@startuml
+start
+:Bam Xoa bill;
+:Hien confirm trinh duyet;
+if (Nguoi dung dong y?) then (Co)
+  :DELETE /api/bills/:id;
+  :Kiem tra session;
+  if (Session hop le?) then (Co)
+    :Xoa theo _id va userId;
+    if (Tim thay?) then (Co)
+      :Tra {id};
+      :Reload bills;
+    else (Khong)
+      :Tra 404;
+    endif
+  else (Khong)
+    :Tra 401;
+  endif
+else (Khong)
+  :Khong thay doi du lieu;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Bills Page" as UI
+participant "DELETE /api/bills/:id" as Api
+participant "SessionService" as Session
+participant "BillRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Bam Xoa
+UI -> User : window.confirm
+User --> UI : Dong y
+UI -> Api : DELETE
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Repo : deleteBillById(userId,id)
+Repo -> DB : findOneAndDelete({_id,id,userId})
+DB --> Repo : removed doc hoac null
+Api --> UI : {id} hoac 404
+UI --> User : Toast va reload
+@enduml
+
+------------------------------------------------------------
+UC11 - Xac nhan khoan dong da thanh toan
+------------------------------------------------------------
+
+Muc tieu:
+- Ghi nhan mot khoan dong da duoc thanh toan/dong tien, kem ngay dong, so tien va ghi chu.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB.
+- Khong co payment gateway. Day la thao tac ghi nhan thu cong.
+
+Tien dieu kien:
+- Khoan dong ton tai va chua bi xoa.
+
+Kich hoat:
+- Nguoi dung bam "Xac nhan da dong" tren bill chua dong.
+
+Du lieu vao:
+- paidAt: YYYY-MM-DD bat buoc.
+- paidAmount: number > 0 tuy chon.
+- paidNote: string tuy chon.
+
+Luong chinh:
+1. UI mo dialog Xac nhan da dong.
+2. UI mac dinh paidAt la ngay hien tai, paidAmount la amount cua bill.
+3. Nguoi dung chinh sua neu can.
+4. Nguoi dung bam Xac nhan.
+5. UI validate paidAt va paidAmount neu co.
+6. UI goi PATCH /api/bills/:id/pay.
+7. API kiem tra session.
+8. API validate body bang Zod.
+9. Repo set paid = true, paidAt, paidAmount, paidNote.
+10. API tra { id }.
+11. UI dong dialog, hien toast va reload bills.
+
+Luong thay the/ngoai le:
+- Khong co paidAt: UI bao loi.
+- paidAmount <= 0: UI/API bao loi.
+- Chua dang nhap: API tra 401.
+- Bill khong ton tai/khong thuoc user: API tra 404.
+
+Dau ra/hau dieu kien:
+- Bill co paid = true.
+- Bill khong duoc tinh vao danh sach du tru reserveInWindow vi bill.paid bi bo qua.
+
+Phu thuoc:
+- payBill, bill paid fields, MongoDB.
+
+API/lop lien quan:
+- PATCH /api/bills/:id/pay
+- src/lib/repo/billsRepo.ts
+- src/app/bills/page.tsx
+
+Activity Diagram:
+@startuml
+start
+:Bam Xac nhan da dong;
+:Mo dialog thanh toan;
+:Nhap/chinh paidAt, paidAmount, paidNote;
+:Bam Xac nhan;
+if (paidAt hop le va paidAmount hop le?) then (Co)
+  :PATCH /api/bills/:id/pay;
+  :Kiem tra session;
+  if (Session hop le?) then (Co)
+    :Validate body;
+    :Set paid=true, paidAt, paidAmount, paidNote;
+    if (Tim thay bill?) then (Co)
+      :Tra {id};
+      :Dong dialog va reload;
+    else (Khong)
+      :Tra 404;
+    endif
+  else (Khong)
+    :Tra 401;
+  endif
+else (Khong)
+  :Hien loi nhap lieu;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Bills Page" as UI
+participant "PATCH /api/bills/:id/pay" as Api
+participant "SessionService" as Session
+participant "BillRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Bam Xac nhan da dong
+UI --> User : Dialog paidAt/paidAmount/paidNote
+User -> UI : Bam Xac nhan
+UI -> Api : PATCH {paidAt, paidAmount?, paidNote?}
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Repo : payBill(userId,id,paidAt,paidAmount,paidNote)
+Repo -> DB : findOneAndUpdate set paid fields
+DB --> Repo : updated doc hoac null
+Repo --> Api : result
+Api --> UI : {id} hoac 404
+UI --> User : Toast va reload
+@enduml
+
+------------------------------------------------------------
+UC12 - Hoan tac trang thai da dong cua khoan dong
+------------------------------------------------------------
+
+Muc tieu:
+- Dua mot bill da dong ve trang thai chua dong va xoa thong tin paidAt/paidAmount/paidNote.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB.
+
+Tien dieu kien:
+- Bill ton tai va dang co paid = true.
+
+Kich hoat:
+- Nguoi dung bam "Hoan tac" tren bill da dong.
+
+Du lieu vao:
+- bill id.
+
+Luong chinh:
+1. Nguoi dung bam Hoan tac.
+2. UI goi PATCH /api/bills/:id/unpay.
+3. API kiem tra session.
+4. Repo set paid = false va unset paidAt, paidAmount, paidNote.
+5. API tra { id }.
+6. UI hien toast va reload bills.
+
+Luong thay the/ngoai le:
+- Chua dang nhap: API tra 401.
+- Bill khong ton tai/khong thuoc user: API tra 404.
+
+Dau ra/hau dieu kien:
+- Bill quay lai trang thai chua dong.
+- Bill co the duoc tinh lai vao du tru ky luong neu nam trong cua so ky luong.
+
+Phu thuoc:
+- unpayBill, reserveInWindow.
+
+API/lop lien quan:
+- PATCH /api/bills/:id/unpay
+- src/lib/repo/billsRepo.ts
+
+Activity Diagram:
+@startuml
+start
+:Bam Hoan tac;
+:PATCH /api/bills/:id/unpay;
+:Kiem tra session;
+if (Session hop le?) then (Co)
+  :Set paid=false;
+  :Unset paidAt/paidAmount/paidNote;
+  if (Tim thay bill?) then (Co)
+    :Tra {id};
+    :Reload bills;
+  else (Khong)
+    :Tra 404;
+  endif
+else (Khong)
+  :Tra 401;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Bills Page" as UI
+participant "PATCH /api/bills/:id/unpay" as Api
+participant "SessionService" as Session
+participant "BillRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Bam Hoan tac
+UI -> Api : PATCH
+Api -> Session : getSessionUserFromRequest()
+Session --> Api : AuthUser
+Api -> Repo : unpayBill(userId,id)
+Repo -> DB : findOneAndUpdate paid=false, unset paid fields
+DB --> Repo : updated doc hoac null
+Repo --> Api : result
+Api --> UI : {id} hoac 404
+UI --> User : Toast va reload
+@enduml
+
+------------------------------------------------------------
+UC13 - Xem du tru cac khoan can dong trong ky luong
+------------------------------------------------------------
+
+Muc tieu:
+- Tinh tong tien can de rieng cho cac khoan dong chua thanh toan truoc ngay nhan luong tiep theo.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB cung cap bills va settings.
+
+Tien dieu kien:
+- Dashboard da tai bills va settings.
+- Settings co paydayDay va salaryExpected.
+
+Kich hoat:
+- Nguoi dung mo Dashboard, thay doi bills, thay doi settings hoac reload dashboard.
+
+Du lieu vao:
+- bills: danh sach BillDTO.
+- paydayDay: ngay nhan luong.
+- salaryExpected: luong du kien.
+- today: ngay hien tai tren client.
+
+Luong chinh:
+1. Dashboard lay settings va bills.
+2. payrollWindow(today, paydayDay) tinh lastPay va nextPay.
+3. reserveInWindow bo qua bill da paid.
+4. Voi moi bill chua paid, he thong tinh dueDate trong ky dua tren dueDay.
+5. He thong bo qua bill ngoai khoang start/end neu co.
+6. Neu lastPay < dueDate <= nextPay thi dua vao danh sach can dong.
+7. He thong tinh reserveTotal.
+8. SummaryCards hien "Du tru truoc luong toi".
+9. BillsInWindow hien tung khoan can dong va ngay den han.
+10. He thong tinh du/thieu = salaryExpected - reserveTotal.
+
+Luong thay the/ngoai le:
+- Khong co bill phu hop: hien "Khong co khoan can dong".
+- Bill co dueDay vuot so ngay trong thang: clampDayInMonth dua ve ngay cuoi thang.
+
+Dau ra/hau dieu kien:
+- Khong thay doi database.
+- Nguoi dung biet can giu lai bao nhieu tien truoc ky luong tiep theo.
+
+Phu thuoc:
+- payrollWindow, reserveInWindow, Settings, Bill.
+
+API/lop lien quan:
+- GET /api/bills
+- GET /api/settings
+- src/lib/domain/payroll.ts
+- src/lib/domain/reserve.ts
+- src/components/dashboard/SummaryCards.tsx
+- src/components/dashboard/BillsInWindow.tsx
+
+Activity Diagram:
+@startuml
+start
+:Tai settings va bills;
+:Tinh payrollWindow(today, paydayDay);
+:Khoi tao reserveTotal = 0;
+while (Con bill?) is (Co)
+  if (bill.paid?) then (Co)
+    :Bo qua bill;
+  else (Khong)
+    :Tinh dueDate tu dueDay;
+    :Clamp ngay neu thang khong du ngay;
+    if (dueDate trong (lastPay, nextPay] va nam trong start/end?) then (Co)
+      :Them vao reserve items;
+      :Cong amount vao reserveTotal;
+    else (Khong)
+      :Bo qua;
+    endif
+  endif
+endwhile (Khong)
+:Sap xep items theo dueDate;
+:Hien reserveTotal va bills can dong;
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Dashboard" as UI
+participant "GET /api/settings" as SettingsApi
+participant "GET /api/bills" as BillsApi
+participant "PayrollService" as Payroll
+participant "ReserveService" as Reserve
+database "MongoDB" as DB
+
+User -> UI : Mo Dashboard
+UI -> SettingsApi : GET
+SettingsApi -> DB : find/create Settings
+DB --> SettingsApi : SettingsDTO
+UI -> BillsApi : GET
+BillsApi -> DB : find bills
+DB --> BillsApi : BillDTO[]
+UI -> Payroll : payrollWindow(today, paydayDay)
+Payroll --> UI : {lastPay,nextPay}
+UI -> Reserve : reserveInWindow(bills, window)
+Reserve --> UI : {total, items}
+UI --> User : Du tru va danh sach can dong
+@enduml
+
+------------------------------------------------------------
+UC14 - Cau hinh ngay luong va luong du kien
+------------------------------------------------------------
+
+Muc tieu:
+- Cho phep nguoi dung cau hinh ngay nhan luong va muc luong du kien de he thong tinh ky luong va du/thieu.
+
+Tac nhan chinh:
+- Nguoi dung da dang nhap.
+
+Tac nhan phu/ben thu ba:
+- MongoDB.
+
+Tien dieu kien:
+- Session hop le.
+
+Kich hoat:
+- Nguoi dung mo trang /settings va bam "Luu cai dat".
+
+Du lieu vao:
+- paydayDay: so nguyen 1..31.
+- salaryExpected: number >= 0.
+
+Luong chinh:
+1. Settings page goi GET /api/settings khi mo trang.
+2. Neu user chua co settings, repository tao mac dinh.
+3. UI hien form paydayDay va salaryExpected.
+4. Nguoi dung chinh sua va bam Luu.
+5. UI validate paydayDay trong 1..31 va salaryExpected >= 0.
+6. UI goi POST /api/settings.
+7. API kiem tra session.
+8. API validate body bang Zod.
+9. Repository update settings neu da ton tai, hoac tao moi neu chua co.
+10. API tra settings moi.
+11. UI hien toast thanh cong.
+
+Luong thay the/ngoai le:
+- paydayDay ngoai 1..31: UI/API bao loi.
+- salaryExpected am hoac khong phai so: UI/API bao loi.
+- Chua dang nhap: API tra 401.
+
+Dau ra/hau dieu kien:
+- Settings duoc luu.
+- Dashboard sau khi reload se tinh payrollWindow va reserve theo cau hinh moi.
+
+Phu thuoc:
+- settingsRepo, payrollWindow, reserveInWindow.
+
+API/lop lien quan:
+- GET /api/settings
+- POST /api/settings
+- src/lib/repo/settingsRepo.ts
+- src/app/settings/page.tsx
+
+Activity Diagram:
+@startuml
+start
+:Mo trang Cai dat;
+:GET /api/settings;
+if (Settings da ton tai?) then (Co)
+  :Tra settings hien tai;
+else (Khong)
+  :Tao settings mac dinh;
+endif
+:Hien form;
+:Nguoi dung sua ngay luong/luong du kien;
+:Bam Luu;
+if (paydayDay 1..31 va salaryExpected >= 0?) then (Co)
+  :POST /api/settings;
+  :Kiem tra session va validate body;
+  :Update hoac create settings;
+  :Tra settings moi;
+  :Hien toast thanh cong;
+else (Khong)
+  :Hien loi nhap lieu;
+endif
+stop
+@enduml
+
+Sequence Diagram:
+@startuml
+actor User
+participant "Settings Page" as UI
+participant "GET /api/settings" as GetApi
+participant "POST /api/settings" as PostApi
+participant "SessionService" as Session
+participant "SettingsRepository" as Repo
+database "MongoDB" as DB
+
+User -> UI : Mo /settings
+UI -> GetApi : GET
+GetApi -> Session : getSessionUserFromRequest()
+Session --> GetApi : AuthUser
+GetApi -> Repo : getSettings(userId)
+Repo -> DB : findOne hoac create default
+DB --> Repo : Settings
+GetApi --> UI : SettingsDTO
+User -> UI : Sua form va bam Luu
+UI -> UI : Validate
+UI -> PostApi : POST {paydayDay, salaryExpected}
+PostApi -> Session : getSessionUserFromRequest()
+Session --> PostApi : AuthUser
+PostApi -> Repo : updateSettings(userId,payload)
+Repo -> DB : findOne/save hoac create
+DB --> Repo : Settings
+PostApi --> UI : SettingsDTO
+UI --> User : Toast thanh cong
+@enduml
+
+============================================================
+7. TRANG THAI VA RANG BUOC NGHIEP VU
+============================================================
+
+7.1 State Diagram - Trang thai giao dich
+
+@startuml
+[*] --> Parsed : quickParse thanh cong
+Parsed --> Stored : insertTransactions
+Stored --> Updated : PATCH /api/transactions/:id
+Updated --> Updated : PATCH tiep
+Stored --> Deleted : DELETE /api/transactions/:id
+Updated --> Deleted : DELETE /api/transactions/:id
+Deleted --> [*]
+
+Parsed --> Skipped : Khong parse duoc amount
+Skipped --> [*]
+@enduml
+
+7.2 State Diagram - Trang thai khoan dong
+
+@startuml
+[*] --> Unpaid : Tao bill moi
+Unpaid --> Unpaid : Sua thong tin bill
+Unpaid --> Paid : PATCH /pay hoac /paid paid=true
+Paid --> Paid : Sua thong tin bill
+Paid --> Unpaid : PATCH /unpay hoac /paid paid=false
+Unpaid --> Deleted : DELETE /api/bills/:id
+Paid --> Deleted : DELETE /api/bills/:id
+Deleted --> [*]
+@enduml
+
+7.3 Cac rang buoc nghiep vu quan trong
+
+Rang buoc xac thuc:
+- Moi API nghiep vu ve transactions, bills, settings deu can session hop le.
+- Session token la payload base64url + HMAC SHA-256 signature.
+- Session het han sau 30 ngay.
+- OAuth state cookie het han sau 10 phut.
+
+Rang buoc giao dich:
+- date phai dung YYYY-MM-DD.
+- type chi duoc la expense hoac income.
+- amount phai lon hon 0.
+- category va desc bat buoc.
+- Giao dich luu date o dau ngay bang startOfDay.
+- Truy van theo thang dung khoang [startOfMonth, startOfNextMonth).
+- Moi cap nhat/xoa deu loc theo _id va userId de tranh truy cap du lieu user khac.
+
+Rang buoc quick input:
+- Raw co the tach theo xuong dong, ";" hoac "；".
+- Dong bat dau bang "+" hoac "thu:" duoc xem la thu nhap.
+- Neu khong co category, expense mac dinh "An uong", income mac dinh "Luong".
+- Category co the nam trong cap ngoac vuong o dau dong, vi du [Di lai].
+- Source co the nam sau ky tu "@", vi du @Grab.
+- So tien hop le la so duong, co the ket thuc bang "k".
+- Dong khong co so tien hop le se bi skipped.
+
+Rang buoc khoan dong:
+- name bat buoc.
+- amount phai lon hon 0.
+- dueDay la so nguyen tu 1 den 31.
+- Neu co start va end thi start <= end.
+- Khi paid = true, bill bi bo qua khi tinh reserveInWindow.
+- Khi unpay, he thong xoa paidAt, paidAmount, paidNote.
+
+Rang buoc ky luong va du tru:
+- paydayDay duoc clamp theo so ngay cua thang. Vi du paydayDay = 31 trong thang 2 se tro thanh ngay cuoi thang 2.
+- payrollWindow gom lastPay va nextPay dua tren ngay hien tai.
+- Bill duoc tinh vao du tru neu chua paid, dueDate nam trong khoang lastPay < dueDate <= nextPay va khong nam ngoai start/end.
+- Du/Thieu = salaryExpected - reserveTotal.
+
+7.4 Ma nguon tham chieu chinh
+
+- src/app/layout.tsx: layout, navigation, AuthGate.
+- src/app/page.tsx: dashboard, tong hop transaction/bill/settings.
+- src/app/bills/page.tsx: quan ly khoan dong.
+- src/app/settings/page.tsx: cau hinh ky luong.
+- src/components/auth/AuthProvider.tsx: trang thai dang nhap client.
+- src/components/auth/AuthGate.tsx: chan truy cap neu chua login.
+- src/components/dashboard/DayPanel.tsx: quick input, loc/tim, sua/xoa giao dich.
+- src/components/dashboard/CalendarMonth.tsx: lich thang.
+- src/components/dashboard/AnalyticsSection.tsx: bieu do.
+- src/lib/auth/session.ts: session cookie, HMAC, OAuth cookies.
+- src/lib/auth/google.ts: OAuth URL va verify Google id_token.
+- src/lib/db/models.ts: Mongoose schemas.
+- src/lib/repo/transactionsRepo.ts: truy van/cap nhat/xoa giao dich.
+- src/lib/repo/billsRepo.ts: CRUD bill va trang thai paid.
+- src/lib/repo/settingsRepo.ts: lay/cap nhat settings.
+- src/lib/repo/usersRepo.ts: upsert Google user.
+- src/lib/domain/quickParse.ts: parse quick input.
+- src/lib/domain/payroll.ts: tinh ky luong.
+- src/lib/domain/reserve.ts: tinh du tru khoan dong.
+- src/lib/domain/analytics.ts: tinh du lieu bieu do.
+
+============================================================
+KET LUAN
+============================================================
+
+He thong IN-OUT Tracker la ung dung quan ly thu chi ca nhan co kien truc kha ro:
+- Client React hien thi dashboard, bills va settings.
+- API routes dong vai tro application service: kiem tra session, validate input, goi repository.
+- Domain functions xu ly nghiep vu tinh toan khong phu thuoc UI.
+- Repository/Mongoose luu tru du lieu trong MongoDB.
+- Google OAuth la tich hop ben thu ba duy nhat lien quan den dinh danh nguoi dung.
+
+Bo UML trong file nay co the dung de dua vao bao cao, hoac copy tung khoi @startuml ... @enduml vao PlantUML de xuat thanh hinh anh.

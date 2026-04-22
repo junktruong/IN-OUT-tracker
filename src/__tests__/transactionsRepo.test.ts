@@ -6,6 +6,8 @@ import { toYmd } from "@/lib/domain/date";
 
 let mongo: MongoMemoryServer;
 let repo: typeof import("@/lib/repo/transactionsRepo");
+const USER_ID = "google-user-a";
+const OTHER_USER_ID = "google-user-b";
 
 beforeAll(async () => {
   mongo = await MongoMemoryServer.create();
@@ -20,7 +22,7 @@ afterAll(async () => {
 
 describe("transactionsRepo", () => {
   it("inserts transactions", async () => {
-    const result = await repo.insertTransactions([
+    const result = await repo.insertTransactions(USER_ID, [
       {
         date: new Date("2024-05-10T10:00:00"),
         type: "expense",
@@ -33,7 +35,7 @@ describe("transactionsRepo", () => {
   });
 
   it("queries by month", async () => {
-    await repo.insertTransactions([
+    await repo.insertTransactions(USER_ID, [
       {
         date: new Date("2024-06-05T00:00:00"),
         type: "income",
@@ -42,12 +44,12 @@ describe("transactionsRepo", () => {
         desc: "Thưởng",
       },
     ]);
-    const items = await repo.getTransactionsByMonth("2024-06");
+    const items = await repo.getTransactionsByMonth(USER_ID, "2024-06");
     expect(items.length).toBeGreaterThan(0);
   });
 
   it("queries by day", async () => {
-    await repo.insertTransactions([
+    await repo.insertTransactions(USER_ID, [
       {
         date: new Date("2024-07-02T08:00:00"),
         type: "expense",
@@ -56,12 +58,12 @@ describe("transactionsRepo", () => {
         desc: "Cà phê sáng",
       },
     ]);
-    const items = await repo.getTransactionsByDay("2024-07-02");
+    const items = await repo.getTransactionsByDay(USER_ID, "2024-07-02");
     expect(items.length).toBeGreaterThan(0);
   });
 
   it("updates transaction by id", async () => {
-    const [created] = await repo.insertTransactions([
+    const [created] = await repo.insertTransactions(USER_ID, [
       {
         date: new Date("2024-08-01T13:00:00"),
         type: "expense",
@@ -70,7 +72,7 @@ describe("transactionsRepo", () => {
         desc: "Grab",
       },
     ]);
-    const updated = await repo.updateTransactionById(String(created._id), {
+    const updated = await repo.updateTransactionById(USER_ID, String(created._id), {
       date: new Date("2024-08-02T09:00:00"),
       type: "expense",
       amount: 30000,
@@ -82,7 +84,7 @@ describe("transactionsRepo", () => {
   });
 
   it("deletes transaction by id", async () => {
-    const [created] = await repo.insertTransactions([
+    const [created] = await repo.insertTransactions(USER_ID, [
       {
         date: new Date("2024-09-01T13:00:00"),
         type: "income",
@@ -91,7 +93,40 @@ describe("transactionsRepo", () => {
         desc: "Hoàn tiền",
       },
     ]);
-    const removed = await repo.deleteTransactionById(String(created._id));
+    const removed = await repo.deleteTransactionById(USER_ID, String(created._id));
     expect(removed?.desc).toBe("Hoàn tiền");
+  });
+
+  it("scopes transaction reads and writes by user id", async () => {
+    const [otherUserTransaction] = await repo.insertTransactions(OTHER_USER_ID, [
+      {
+        date: new Date("2024-10-03T13:00:00"),
+        type: "income",
+        amount: 700000,
+        category: "Thu khác",
+        desc: "Không thuộc user hiện tại",
+      },
+    ]);
+
+    const userItems = await repo.getTransactionsByMonth(USER_ID, "2024-10");
+    const blockedUpdate = await repo.updateTransactionById(
+      USER_ID,
+      String(otherUserTransaction._id),
+      {
+        date: new Date("2024-10-04T09:00:00"),
+        type: "income",
+        amount: 900000,
+        category: "Thu khác",
+        desc: "Không được cập nhật",
+      }
+    );
+    const blockedDelete = await repo.deleteTransactionById(
+      USER_ID,
+      String(otherUserTransaction._id)
+    );
+
+    expect(userItems).toHaveLength(0);
+    expect(blockedUpdate).toBeNull();
+    expect(blockedDelete).toBeNull();
   });
 });

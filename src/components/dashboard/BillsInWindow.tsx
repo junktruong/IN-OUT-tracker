@@ -12,7 +12,7 @@ export function BillsInWindow({ bills, reserveTotal }: { bills: ReserveBill[]; r
     new Intl.NumberFormat("vi-VN").format(value);
 
   return (
-    <Card>
+    <Card className="border-0">
       <CardContent className="p-4 sm:p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold">Khoản cần đóng trong kỳ</p>
@@ -26,8 +26,8 @@ export function BillsInWindow({ bills, reserveTotal }: { bills: ReserveBill[]; r
           ) : (
             bills.map((bill) => (
               <div
-                key={bill.id}
-                className="flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                key={`${bill.id}-${bill.dueDate}`}
+                className="flex flex-col gap-2 rounded-lg bg-muted/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <p className="break-words text-sm font-medium">{bill.name}</p>

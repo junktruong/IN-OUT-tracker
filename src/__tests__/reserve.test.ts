@@ -13,7 +13,8 @@ describe("reserveInWindow", () => {
           id: "1",
           name: "Tiền nhà",
           amount: 5000000,
-          dueDay: 20,
+          cycleType: "monthly",
+          cycleValue: 20,
           paid: false,
         },
       ],
@@ -31,7 +32,8 @@ describe("reserveInWindow", () => {
           id: "1",
           name: "Internet",
           amount: 300000,
-          dueDay: 18,
+          cycleType: "monthly",
+          cycleValue: 18,
           paid: true,
         },
       ],
@@ -48,7 +50,8 @@ describe("reserveInWindow", () => {
           id: "1",
           name: "Bảo hiểm",
           amount: 900000,
-          dueDay: 5,
+          cycleType: "monthly",
+          cycleValue: 5,
           paid: false,
         },
       ],
@@ -65,7 +68,8 @@ describe("reserveInWindow", () => {
           id: "1",
           name: "Gói tập",
           amount: 200000,
-          dueDay: 25,
+          cycleType: "monthly",
+          cycleValue: 25,
           paid: false,
           start: new Date("2024-06-01T00:00:00"),
         },
@@ -83,7 +87,8 @@ describe("reserveInWindow", () => {
           id: "1",
           name: "Hội phí",
           amount: 100000,
-          dueDay: 20,
+          cycleType: "monthly",
+          cycleValue: 20,
           paid: false,
           end: new Date("2024-05-10T00:00:00"),
         },
@@ -92,5 +97,50 @@ describe("reserveInWindow", () => {
     );
 
     expect(result.total).toBe(0);
+  });
+
+  it("includes every weekly occurrence inside the payroll window", () => {
+    const result = reserveInWindow(
+      [
+        {
+          id: "1",
+          name: "Giặt ủi",
+          amount: 50000,
+          cycleType: "weekly",
+          cycleValue: 1,
+          paid: false,
+        },
+      ],
+      window
+    );
+
+    expect(result.items.map((item) => item.dueDate)).toEqual([
+      "2024-05-06",
+      "2024-05-13",
+      "2024-05-20",
+      "2024-05-27",
+      "2024-06-03",
+    ]);
+    expect(result.total).toBe(250000);
+  });
+
+  it("uses start date as the custom-days cycle anchor", () => {
+    const result = reserveInWindow(
+      [
+        {
+          id: "1",
+          name: "Thuốc",
+          amount: 120000,
+          cycleType: "custom_days",
+          cycleValue: 10,
+          paid: false,
+          start: new Date("2024-05-10T00:00:00"),
+        },
+      ],
+      window
+    );
+
+    expect(result.items.map((item) => item.dueDate)).toEqual(["2024-05-10", "2024-05-20", "2024-05-30"]);
+    expect(result.total).toBe(360000);
   });
 });

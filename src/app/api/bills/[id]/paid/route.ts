@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { toggleBillPaid } from "@/lib/repo/billsRepo";
+import { getSessionUserFromRequest, unauthorizedResponse } from "@/lib/auth/session";
 
 const bodySchema = z.object({
   paid: z.boolean(),
@@ -11,6 +12,11 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const user = getSessionUserFromRequest(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
+
   const { id } = await context.params;
   const body = await request.json();
   const parse = bodySchema.safeParse(body);
@@ -20,7 +26,7 @@ export async function PATCH(
   }
 
   const paidAt = parse.data.paid ? new Date() : null;
-  const updated = await toggleBillPaid(id, parse.data.paid, paidAt);
+  const updated = await toggleBillPaid(user.id, id, parse.data.paid, paidAt);
 
   return NextResponse.json({ id: String(updated?._id) });
 }

@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { addMonths, monthKey, toYmd } from "@/lib/domain/date";
 import { payrollWindow } from "@/lib/domain/payroll";
 import { reserveInWindow } from "@/lib/domain/reserve";
+import type { TransactionInput } from "@/lib/domain/transactions";
 import type { BillDTO, SettingsDTO, TransactionDTO } from "@/lib/types";
 
 const formatCurrency = (value: number) =>
@@ -24,9 +25,10 @@ export default function HomePage() {
   const [transactions, setTransactions] = useState<TransactionDTO[]>([]);
   const [bills, setBills] = useState<BillDTO[]>([]);
   const [settings, setSettings] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
+  const year = Number(month.slice(0, 4));
 
-  const fetchMonth = useCallback(async (targetMonth: string) => {
-    const response = await fetch(`/api/transactions?month=${targetMonth}`);
+  const fetchYear = useCallback(async (targetYear: number) => {
+    const response = await fetch(`/api/transactions?year=${targetYear}`);
     if (!response.ok) {
       throw new Error("Không thể tải giao dịch.");
     }
@@ -52,9 +54,9 @@ export default function HomePage() {
     return data as SettingsDTO;
   }, []);
 
-  const loadMonth = useCallback(async (targetMonth: string) => {
-    setTransactions(await fetchMonth(targetMonth));
-  }, [fetchMonth]);
+  const loadYear = useCallback(async (targetYear: number) => {
+    setTransactions(await fetchYear(targetYear));
+  }, [fetchYear]);
 
   useEffect(() => {
     let ignore = false;
@@ -78,19 +80,24 @@ export default function HomePage() {
   useEffect(() => {
     let ignore = false;
 
-    const loadSelectedMonth = async () => {
-      const items = await fetchMonth(month);
+    const loadSelectedYear = async () => {
+      const items = await fetchYear(year);
       if (!ignore) {
         setTransactions(items);
       }
     };
 
-    void loadSelectedMonth();
+    void loadSelectedYear();
 
     return () => {
       ignore = true;
     };
-  }, [fetchMonth, month]);
+  }, [fetchYear, year]);
+
+  const monthTransactions = useMemo(
+    () => transactions.filter((item) => item.date.startsWith(month)),
+    [month, transactions]
+  );
 
   const byDay = useMemo(() => {
     const map = new Map<string, TransactionDTO[]>();
@@ -103,7 +110,7 @@ export default function HomePage() {
   }, [transactions]);
 
   const monthSummary = useMemo(() => {
-    return transactions.reduce(
+    return monthTransactions.reduce(
       (acc, item) => {
         if (item.type === "income") {
           acc.income += item.amount;
@@ -115,7 +122,7 @@ export default function HomePage() {
       },
       { income: 0, expense: 0, net: 0 }
     );
-  }, [transactions]);
+  }, [monthTransactions]);
 
   const dayItems = byDay.get(selectedDay) ?? [];
   const daySummary = dayItems.reduce(
@@ -137,10 +144,12 @@ export default function HomePage() {
       id: bill.id,
       name: bill.name,
       amount: bill.amount,
-      dueDay: bill.dueDay,
+      cycleType: bill.cycleType,
+      cycleValue: bill.cycleValue,
       paid: bill.paid,
       start: bill.start ? new Date(bill.start) : null,
       end: bill.end ? new Date(bill.end) : null,
+      createdAt: bill.createdAt ? new Date(bill.createdAt) : null,
     })),
     payroll
   );
@@ -155,6 +164,14 @@ export default function HomePage() {
     }
   };
 
+  const handleSelectDay = (dayKey: string) => {
+    setSelectedDay(dayKey);
+    const selectedMonth = dayKey.slice(0, 7);
+    if (selectedMonth !== month) {
+      setMonth(selectedMonth);
+    }
+  };
+
   const handleQuickAdd = async (raw: string) => {
     const response = await fetch("/api/transactions/quick", {
       method: "POST",
@@ -166,6 +183,17 @@ export default function HomePage() {
     }
     const data = await response.json();
     return data;
+  };
+
+  const handleManualAdd = async (payload: TransactionInput) => {
+    const response = await fetch("/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error("Không thể thêm giao dịch.");
+    }
   };
 
   return (
@@ -193,7 +221,7 @@ export default function HomePage() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground lg:text-right">
+          <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground lg:text-right">
             <span className="font-semibold text-foreground">Kỳ lương:</span> {payrollLabel}
           </div>
         </CardContent>
@@ -211,7 +239,7 @@ export default function HomePage() {
             monthKey={month}
             byDay={byDay}
             selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
+            onSelectDay={handleSelectDay}
           />
           <BillsInWindow bills={reserve.items} reserveTotal={reserve.total} />
         </div>
@@ -220,13 +248,18 @@ export default function HomePage() {
           items={dayItems}
           daySummary={daySummary}
           onQuickAdd={handleQuickAdd}
+          onManualAdd={handleManualAdd}
           onReload={() => {
-            void loadMonth(month);
+            void loadYear(year);
           }}
         />
       </div>
 
-      <AnalyticsSection monthKey={month} transactions={transactions} monthSummary={monthSummary} />
+      <AnalyticsSection
+        monthKey={month}
+        transactions={monthTransactions}
+        monthSummary={monthSummary}
+      />
 
       <div className="text-xs text-muted-foreground">
         Tổng giao dịch trong tháng: {formatCurrency(monthSummary.expense + monthSummary.income)}

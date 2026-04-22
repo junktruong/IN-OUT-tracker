@@ -33,6 +33,13 @@ const config: Config = {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        cream: "#FFFBF2",
+        mocha: "#4A3525",
+        caramel: "#8C6239",
+        honey: "#FFC837",
+        latte: "#E6D5C3",
+        "status-income": "#A7D7C5",
+        "status-expense": "#F4A261",
       },
       borderRadius: {
         lg: "var(--radius)",

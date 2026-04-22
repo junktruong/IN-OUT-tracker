@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { payBill } from "@/lib/repo/billsRepo";
+import { getSessionUserFromRequest, unauthorizedResponse } from "@/lib/auth/session";
 
 const bodySchema = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -13,6 +14,11 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const user = getSessionUserFromRequest(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
+
   const { id } = await context.params;
   const body = await request.json();
   const parse = bodySchema.safeParse(body);
@@ -22,6 +28,7 @@ export async function PATCH(
   }
   const payload = parse.data;
   const updated = await payBill(
+    user.id,
     id,
     new Date(`${payload.paidAt}T00:00:00`),
     payload.paidAmount,

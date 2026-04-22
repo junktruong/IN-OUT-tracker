@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { TransactionComposer } from "@/components/dashboard/TransactionComposer";
 import { transactionSchema } from "@/lib/domain/transactions";
+import type { TransactionInput } from "@/lib/domain/transactions";
 import { TransactionDTO } from "@/lib/types";
 
 export type DayPanelProps = {
@@ -17,15 +18,21 @@ export type DayPanelProps = {
   items: TransactionDTO[];
   daySummary: { income: number; expense: number; net: number };
   onQuickAdd: (raw: string) => Promise<{ added: number; skipped: string[] }>;
+  onManualAdd: (payload: TransactionInput) => Promise<void>;
   onReload: () => void;
 };
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN").format(value);
 
-export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: DayPanelProps) {
-  const [raw, setRaw] = useState("");
-  const [loading, setLoading] = useState(false);
+export function DayPanel({
+  dayKey,
+  items,
+  daySummary,
+  onQuickAdd,
+  onManualAdd,
+  onReload,
+}: DayPanelProps) {
   const [filter, setFilter] = useState<"all" | "expense" | "income">("all");
   const [keyword, setKeyword] = useState("");
   const [editing, setEditing] = useState<TransactionDTO | null>(null);
@@ -69,24 +76,6 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
         .includes(needle);
     });
   }, [filter, keyword, sorted]);
-
-  const handleSubmit = async () => {
-    if (!raw.trim()) {
-      toast.error("Vui lòng nhập nội dung.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await onQuickAdd(raw);
-      setRaw("");
-      toast.success(`Đã thêm ${result.added} dòng, bỏ qua ${result.skipped.length} dòng.`);
-      onReload();
-    } catch {
-      toast.error("Không thể thêm giao dịch.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const openEdit = (item: TransactionDTO) => {
     setEditing(item);
@@ -197,18 +186,12 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
           </div>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold">Quick input</p>
-          <Textarea
-            value={raw}
-            onChange={(event) => setRaw(event.target.value)}
-            placeholder={`phở 45k; cafe 25k\n[Đi lại] Grab 70k @Grab\n+ [Lương] 15000000 @Công ty`}
-            className="min-h-[110px] sm:min-h-[140px] md:min-h-[160px]"
-          />
-          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Đang thêm..." : "Thêm"}
-          </Button>
-        </div>
+        <TransactionComposer
+          dayKey={dayKey}
+          onQuickAdd={onQuickAdd}
+          onManualAdd={onManualAdd}
+          onReload={onReload}
+        />
 
         <div className="space-y-3">
           <p className="text-sm font-semibold">Giao dịch trong ngày</p>
@@ -305,7 +288,7 @@ export function DayPanel({ dayKey, items, daySummary, onQuickAdd, onReload }: Da
               onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
             />
             <select
-              className="h-10 rounded-md border border-input bg-background px-3 text-base sm:text-sm"
+              className="h-10 rounded-lg border border-input/80 bg-background px-3 text-base sm:text-sm"
               value={form.type}
               onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
             >

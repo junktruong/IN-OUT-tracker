@@ -16,7 +16,8 @@ export type BillDTO = {
   id: string;
   name: string;
   amount: number;
-  dueDay: number;
+  cycleType: "monthly" | "weekly" | "custom_days";
+  cycleValue: number;
   group?: string;
   start?: string;
   end?: string;
@@ -25,6 +26,7 @@ export type BillDTO = {
   paidAt?: string;
   paidAmount?: number;
   paidNote?: string;
+  createdAt?: string;
 };
 
 export type SettingsDTO = {

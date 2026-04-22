@@ -1,31 +1,42 @@
 @import "tailwindcss";
 
+@theme {
+  --color-cream: #FFFBF2;
+  --color-mocha: #4A3525;
+  --color-caramel: #8C6239;
+  --color-honey: #FFC837;
+  --color-primary-honey: #FFC837;
+  --color-latte: #E6D5C3;
+  --color-status-income: #A7D7C5;
+  --color-status-expense: #F4A261;
+}
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --background: 40 100% 97%;
+  --foreground: 27 33% 22%;
+  --muted: 38 55% 92%;
+  --muted-foreground: 30 42% 39%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 47.4% 11.2%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
+  --popover-foreground: 27 33% 22%;
+  --border: 33 36% 83%;
+  --input: 33 36% 83%;
   --card: 0 0% 100%;
-  --card-foreground: 222.2 47.4% 11.2%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
+  --card-foreground: 27 33% 22%;
+  --primary: 45 100% 61%;
+  --primary-foreground: 27 33% 22%;
+  --secondary: 38 55% 92%;
+  --secondary-foreground: 27 33% 22%;
+  --accent: 38 75% 90%;
+  --accent-foreground: 27 33% 22%;
+  --destructive: 18 86% 67%;
   --destructive-foreground: 210 40% 98%;
-  --ring: 215 20.2% 65.1%;
+  --ring: 38 95% 60%;
   --radius: 0.5rem;
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: #FFFBF2;
+  color: #4A3525;
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { quickParse } from "@/lib/domain/quickParse";
 import { insertTransactions } from "@/lib/repo/transactionsRepo";
+import { getSessionUserFromRequest, unauthorizedResponse } from "@/lib/auth/session";
 
 const bodySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -10,6 +11,11 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const user = getSessionUserFromRequest(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
+
   const body = await request.json();
   const parse = bodySchema.safeParse(body);
 
@@ -22,6 +28,7 @@ export async function POST(request: Request) {
 
   if (parsed.items.length > 0) {
     await insertTransactions(
+      user.id,
       parsed.items.map((item) => ({
         ...item,
         date: new Date(`${date}T00:00:00`),

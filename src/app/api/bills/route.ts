@@ -1,27 +1,50 @@
 import { NextResponse } from "next/server";
 import { billSchema } from "@/lib/domain/bills";
 import { listBills, upsertBill } from "@/lib/repo/billsRepo";
+import { getSessionUserFromRequest, unauthorizedResponse } from "@/lib/auth/session";
 
-export async function GET() {
-  const items = await listBills();
-  const response = items.map((item) => ({
-    id: String(item._id),
-    name: item.name,
-    amount: item.amount,
-    dueDay: item.dueDay,
-    group: item.group,
-    start: item.start ? item.start.toISOString().slice(0, 10) : undefined,
-    end: item.end ? item.end.toISOString().slice(0, 10) : undefined,
-    note: item.note,
-    paid: item.paid,
-    paidAt: item.paidAt ? item.paidAt.toISOString().slice(0, 10) : undefined,
-    paidAmount: item.paidAmount ?? undefined,
-    paidNote: item.paidNote ?? undefined,
-  }));
+type LegacyBill = {
+  dueDay?: number;
+};
+
+export async function GET(request: Request) {
+  const user = getSessionUserFromRequest(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
+
+  const items = await listBills(user.id);
+  const response = items.map((item) => {
+    const legacy = item as LegacyBill;
+    const cycleType = item.cycleType ?? "monthly";
+    const cycleValue = item.cycleValue ?? legacy.dueDay ?? 1;
+
+    return {
+      id: String(item._id),
+      name: item.name,
+      amount: item.amount,
+      cycleType,
+      cycleValue,
+      group: item.group,
+      start: item.start ? item.start.toISOString().slice(0, 10) : undefined,
+      end: item.end ? item.end.toISOString().slice(0, 10) : undefined,
+      note: item.note,
+      paid: item.paid,
+      paidAt: item.paidAt ? item.paidAt.toISOString().slice(0, 10) : undefined,
+      paidAmount: item.paidAmount ?? undefined,
+      paidNote: item.paidNote ?? undefined,
+      createdAt: item.createdAt ? item.createdAt.toISOString() : undefined,
+    };
+  });
   return NextResponse.json({ items: response });
 }
 
 export async function POST(request: Request) {
+  const user = getSessionUserFromRequest(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
+
   const body = await request.json();
   const parse = billSchema.safeParse(body);
 
@@ -30,11 +53,12 @@ export async function POST(request: Request) {
   }
 
   const payload = parse.data;
-  const result = await upsertBill({
+  const result = await upsertBill(user.id, {
     id: payload.id,
     name: payload.name,
     amount: payload.amount,
-    dueDay: payload.dueDay,
+    cycleType: payload.cycleType,
+    cycleValue: payload.cycleValue,
     group: payload.group,
     start: payload.start ? new Date(`${payload.start}T00:00:00`) : null,
     end: payload.end ? new Date(`${payload.end}T00:00:00`) : null,

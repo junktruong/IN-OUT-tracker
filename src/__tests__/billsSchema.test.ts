@@ -7,7 +7,8 @@ describe("billSchema", () => {
     const parse = billSchema.safeParse({
       name: "Tiền nhà",
       amount: 5000000,
-      dueDay: 5,
+      cycleType: "monthly",
+      cycleValue: 5,
       start: "2024-01-01",
       end: "2024-12-31",
     });
@@ -18,10 +19,22 @@ describe("billSchema", () => {
     const parse = billSchema.safeParse({
       name: "Internet",
       amount: 300000,
-      dueDay: 10,
+      cycleType: "weekly",
+      cycleValue: 3,
       start: "2024-12-31",
       end: "2024-01-01",
     });
+    expect(parse.success).toBe(false);
+  });
+
+  it("rejects invalid cycle values", () => {
+    const parse = billSchema.safeParse({
+      name: "Internet",
+      amount: 300000,
+      cycleType: "weekly",
+      cycleValue: 9,
+    });
+
     expect(parse.success).toBe(false);
   });
 });

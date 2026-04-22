@@ -22,6 +22,9 @@ export const addMonths = (key: string, delta: number) => {
   return monthKey(date);
 };
 
+export const addDays = (date: Date, days: number) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+
 export const clampDayInMonth = (year: number, monthIndex: number, day: number) => {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   return Math.min(Math.max(day, 1), daysInMonth);
@@ -30,8 +33,20 @@ export const clampDayInMonth = (year: number, monthIndex: number, day: number) =
 export const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
+export const startOfWeek = (date: Date) => {
+  const start = startOfDay(date);
+  const mondayOffset = (start.getDay() + 6) % 7;
+  return addDays(start, -mondayOffset);
+};
+
 export const startOfMonth = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), 1);
 
 export const startOfNextMonth = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
+export const startOfYear = (date: Date) =>
+  new Date(date.getFullYear(), 0, 1);
+
+export const startOfNextYear = (date: Date) =>
+  new Date(date.getFullYear() + 1, 0, 1);
