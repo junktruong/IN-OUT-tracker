@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toYmd } from "@/lib/domain/date";
 import type { BillCycleType } from "@/lib/domain/bills";
 import type { BillDTO } from "@/lib/types";
 
@@ -51,11 +52,7 @@ export default function BillsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [payingBill, setPayingBill] = useState<BillDTO | null>(null);
-  const [payForm, setPayForm] = useState({
-    paidAt: "",
-    paidAmount: "",
-    paidNote: "",
-  });
+  const [confirmingPay, setConfirmingPay] = useState(false);
 
   const fetchBills = useCallback(async () => {
     const response = await fetch("/api/bills");
@@ -178,44 +175,34 @@ export default function BillsPage() {
 
   const openPayDialog = (bill: BillDTO) => {
     setPayingBill(bill);
-    const today = new Date().toISOString().slice(0, 10);
-    setPayForm({
-      paidAt: today,
-      paidAmount: bill.amount ? String(bill.amount) : "",
-      paidNote: bill.paidNote ?? "",
-    });
   };
 
   const handleConfirmPay = async () => {
     if (!payingBill) {
       return;
     }
-    if (!payForm.paidAt) {
-      toast.error("Vui lòng chọn ngày đóng.");
-      return;
-    }
-    const paidAmount = payForm.paidAmount.trim() ? Number(payForm.paidAmount) : undefined;
-    if (paidAmount !== undefined && (!Number.isFinite(paidAmount) || paidAmount <= 0)) {
-      toast.error("Số tiền đã đóng phải lớn hơn 0.");
-      return;
-    }
+    setConfirmingPay(true);
     const payload = {
-      paidAt: payForm.paidAt,
-      paidAmount,
-      paidNote: payForm.paidNote || undefined,
+      paidAt: toYmd(new Date()),
+      paidAmount: payingBill.amount,
     };
-    const response = await fetch(`/api/bills/${payingBill.id}/pay`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
+    try {
+      const response = await fetch(`/api/bills/${payingBill.id}/pay`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error("failed");
+      }
+      toast.success("Đã xác nhận đóng.");
+      setPayingBill(null);
+      void loadBills();
+    } catch {
       toast.error("Không thể xác nhận đã đóng.");
-      return;
+    } finally {
+      setConfirmingPay(false);
     }
-    toast.success("Đã xác nhận đóng.");
-    setPayingBill(null);
-    void loadBills();
   };
 
   const handleUnpay = async (bill: BillDTO) => {
@@ -383,34 +370,38 @@ export default function BillsPage() {
       </Tabs>
 
       <Dialog open={!!payingBill} onOpenChange={(open) => !open && setPayingBill(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận đã đóng</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
-            <Input
-              type="date"
-              value={payForm.paidAt}
-              onChange={(event) => setPayForm((prev) => ({ ...prev, paidAt: event.target.value }))}
-            />
-            <Input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              placeholder="Số tiền đã đóng"
-              value={payForm.paidAmount}
-              onChange={(event) =>
-                setPayForm((prev) => ({ ...prev, paidAmount: event.target.value }))
-              }
-            />
-            <Input
-              placeholder="Ghi chú"
-              value={payForm.paidNote}
-              onChange={(event) => setPayForm((prev) => ({ ...prev, paidNote: event.target.value }))}
-            />
-          </div>
-          <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleConfirmPay}>Xác nhận</Button>
+          {payingBill ? (
+            <div className="rounded-2xl bg-cream p-4 text-sm text-caramel">
+              <p>
+                Xác nhận đã đóng khoản{" "}
+                <span className="font-semibold text-mocha">{payingBill.name}</span>?
+              </p>
+              <p className="mt-2 font-semibold text-mocha">
+                {formatCurrency(payingBill.amount)}
+              </p>
+              <p className="mt-1 text-xs">{cycleLabel(payingBill)}</p>
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2">
+            <Button
+              className="w-full rounded-full sm:w-auto"
+              variant="outline"
+              onClick={() => setPayingBill(null)}
+              disabled={confirmingPay}
+            >
+              Huỷ
+            </Button>
+            <Button
+              className="w-full rounded-full sm:w-auto"
+              onClick={handleConfirmPay}
+              disabled={confirmingPay}
+            >
+              {confirmingPay ? "Đang xác nhận..." : "OK"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
