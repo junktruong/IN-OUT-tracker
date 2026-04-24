@@ -48,14 +48,14 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
   );
 
   return (
-    <Card>
-      <CardHeader className="space-y-1 p-4 sm:p-6">
-        <CardTitle className="text-lg">Phân tích tháng</CardTitle>
-        <p className="text-xs text-muted-foreground">Theo dõi xu hướng chi/thu của tháng {monthKey}</p>
+    <Card className="rounded-3xl border border-latte bg-white shadow-sm shadow-amber-900/5">
+      <CardHeader className="space-y-1 p-4">
+        <CardTitle className="text-lg text-mocha">Phân tích tháng</CardTitle>
+        <p className="text-xs text-caramel">Theo dõi xu hướng chi/thu của tháng {monthKey}</p>
       </CardHeader>
-      <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-        <Tabs defaultValue="trend" className="space-y-4">
-          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 md:inline-flex md:w-auto md:gap-0">
+      <CardContent className="p-4 pt-0">
+        <Tabs defaultValue="trend" className="space-y-3">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-2xl bg-amber-100/80 p-1 md:inline-flex md:w-auto md:gap-0">
             <TabsTrigger className="min-w-0 px-2" value="trend">Xu hướng</TabsTrigger>
             <TabsTrigger className="min-w-0 px-2" value="category">Danh mục</TabsTrigger>
             <TabsTrigger className="min-w-0 px-2" value="overview">Tổng quan</TabsTrigger>
@@ -129,7 +129,7 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
 
           <TabsContent value="overview">
             {monthSummary.income === 0 && monthSummary.expense === 0 ? (
-              <p className="text-sm text-muted-foreground">Chưa có dữ liệu tổng quan trong tháng.</p>
+              <p className="text-sm text-caramel">Chưa có dữ liệu tổng quan trong tháng.</p>
             ) : (
               <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
                 <div className="h-64 w-full sm:h-72">
@@ -153,21 +153,21 @@ export function AnalyticsSection({ monthKey, transactions, monthSummary }: Analy
                   </ResponsiveContainer>
                 </div>
                 <div className="space-y-3 text-sm">
-                  <div className="rounded-lg border bg-muted/40 p-4">
-                    <p className="text-xs uppercase text-muted-foreground">Thu</p>
+                  <div className="rounded-2xl bg-cream p-4">
+                    <p className="text-xs uppercase text-caramel">Thu</p>
                     <p className="mt-1 break-words text-lg font-semibold text-emerald-600">
                       {formatCurrency(monthSummary.income)}
                     </p>
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-4">
-                    <p className="text-xs uppercase text-muted-foreground">Chi</p>
+                  <div className="rounded-2xl bg-cream p-4">
+                    <p className="text-xs uppercase text-caramel">Chi</p>
                     <p className="mt-1 break-words text-lg font-semibold text-rose-600">
                       {formatCurrency(monthSummary.expense)}
                     </p>
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-4">
-                    <p className="text-xs uppercase text-muted-foreground">Ròng</p>
-                    <p className="mt-1 break-words text-lg font-semibold text-foreground">
+                  <div className="rounded-2xl bg-cream p-4">
+                    <p className="text-xs uppercase text-caramel">Ròng</p>
+                    <p className="mt-1 break-words text-lg font-semibold text-mocha">
                       {formatCurrency(monthSummary.net)}
                     </p>
                   </div>

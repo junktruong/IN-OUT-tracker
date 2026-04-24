@@ -1,4 +1,6 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { budgetPeriods } from "@/lib/domain/budgets";
+import { categoryKinds, categoryTypes } from "@/lib/domain/categories";
 
 const transactionSchema = new Schema(
   {
@@ -6,6 +8,7 @@ const transactionSchema = new Schema(
     date: { type: Date, required: true, index: true },
     type: { type: String, enum: ["expense", "income"], required: true },
     amount: { type: Number, required: true },
+    categoryId: { type: String, index: true },
     category: { type: String, required: true },
     desc: { type: String, required: true },
     source: { type: String },
@@ -56,6 +59,35 @@ const settingsSchema = new Schema(
   { versionKey: false }
 );
 
+const categorySchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    slug: { type: String, required: true, index: true },
+    icon: { type: String, required: true, default: "✨" },
+    categoryType: { type: String, enum: categoryTypes, required: true, index: true },
+    kind: { type: String, enum: categoryKinds, required: true, default: "custom", index: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { versionKey: false }
+);
+
+categorySchema.index({ userId: 1, slug: 1, categoryType: 1 }, { unique: true });
+
+const budgetSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    categoryId: { type: String, required: true, index: true },
+    amountLimit: { type: Number, required: true },
+    period: { type: String, enum: budgetPeriods, required: true, index: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { versionKey: false }
+);
+
+budgetSchema.index({ userId: 1, categoryId: 1, period: 1 }, { unique: true });
+
 const userSchema = new Schema(
   {
     googleId: { type: String, required: true, unique: true, index: true },
@@ -71,6 +103,8 @@ const userSchema = new Schema(
 type Transaction = InferSchemaType<typeof transactionSchema>;
 type Bill = InferSchemaType<typeof billSchema>;
 type Settings = InferSchemaType<typeof settingsSchema>;
+type Category = InferSchemaType<typeof categorySchema>;
+type Budget = InferSchemaType<typeof budgetSchema>;
 type User = InferSchemaType<typeof userSchema>;
 
 const TransactionModel: Model<Transaction> =
@@ -83,8 +117,21 @@ const BillModel: Model<Bill> =
 const SettingsModel: Model<Settings> =
   mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
 
+const CategoryModel: Model<Category> =
+  mongoose.models.Category || mongoose.model("Category", categorySchema);
+
+const BudgetModel: Model<Budget> =
+  mongoose.models.Budget || mongoose.model("Budget", budgetSchema);
+
 const UserModel: Model<User> =
   mongoose.models.User || mongoose.model("User", userSchema);
 
-export { TransactionModel, BillModel, SettingsModel, UserModel };
-export type { Transaction, Bill, Settings, User };
+export {
+  TransactionModel,
+  BillModel,
+  SettingsModel,
+  CategoryModel,
+  BudgetModel,
+  UserModel,
+};
+export type { Transaction, Bill, Settings, Category, Budget, User };

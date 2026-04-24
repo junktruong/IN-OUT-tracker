@@ -86,13 +86,13 @@ const compactCurrency = (value: number) =>
 
 function ActivityDots({ income, expense }: { income: number; expense: number }) {
   if (income <= 0 && expense <= 0) {
-    return <span className="h-2" />;
+    return <span className="h-1.5 sm:h-2" />;
   }
 
   return (
     <span className="flex items-center gap-1">
-      {expense > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
-      {income > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> : null}
+      {expense > 0 ? <span className="h-1 w-1 rounded-full bg-rose-500 sm:h-1.5 sm:w-1.5" /> : null}
+      {income > 0 ? <span className="h-1 w-1 rounded-full bg-emerald-500 sm:h-1.5 sm:w-1.5" /> : null}
     </span>
   );
 }
@@ -111,7 +111,7 @@ function DayCell({
   compact?: boolean;
 }) {
   if (!cell.dayKey) {
-    return <div className={compact ? "h-9" : "h-16 sm:h-20"} />;
+    return <div className={compact ? "h-8" : "h-11 sm:h-20"} />;
   }
 
   const totals = sumDay(byDay.get(cell.dayKey) ?? []);
@@ -124,13 +124,13 @@ function DayCell({
       type="button"
       onClick={() => onSelectDay(cell.dayKey!)}
       className={cn(
-        "flex min-w-0 flex-col items-start justify-between rounded-lg px-2 py-2 text-left transition hover:bg-muted",
-        compact ? "h-9 text-[10px]" : "h-16 text-xs sm:h-20",
+        "flex min-w-0 flex-col items-start justify-between rounded-xl px-1 py-1 text-left transition hover:bg-muted sm:px-2 sm:py-2",
+        compact ? "h-8 text-[10px]" : "h-11 text-[11px] sm:h-20 sm:text-xs",
         isSelected && "bg-foreground text-background hover:bg-foreground",
         !isSelected && hasActivity && "bg-background"
       )}
     >
-      <span className={cn("font-semibold", compact ? "text-[10px]" : "text-sm")}>
+      <span className={cn("font-semibold", compact ? "text-[10px]" : "text-xs sm:text-sm")}>
         {cell.label}
       </span>
       <span className="flex w-full min-w-0 items-center justify-between gap-1">
@@ -138,7 +138,7 @@ function DayCell({
         {!compact && hasActivity ? (
           <span
             className={cn(
-              "truncate text-[10px] tabular-nums",
+              "hidden truncate text-[10px] tabular-nums sm:inline",
               isSelected ? "text-background/80" : net >= 0 ? "text-emerald-600" : "text-rose-600"
             )}
           >
@@ -163,12 +163,12 @@ function WeekView({
 
   return (
     <div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium text-muted-foreground sm:text-xs">
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium text-muted-foreground sm:gap-1 sm:text-xs">
         {weekdayLabels.map((label) => (
           <span key={label}>{label}</span>
         ))}
       </div>
-      <div className="mt-2 grid grid-cols-7 gap-1.5">
+      <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-1.5">
         {cells.map((cell) => (
           <DayCell
             key={cell.dayKey}
@@ -197,24 +197,22 @@ function MonthView({
   const cells = buildMonthCells(activeMonth);
 
   return (
-    <div className="-mx-1 overflow-x-auto pb-1">
-      <div className="min-w-[560px] px-1 sm:min-w-0">
-        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium text-muted-foreground sm:text-xs">
-          {weekdayLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        <div className="mt-2 grid grid-cols-7 gap-1.5 sm:gap-2">
-          {cells.map((cell, index) => (
-            <DayCell
-              key={cell.dayKey ?? `empty-${index}`}
-              cell={cell}
-              byDay={byDay}
-              selectedDay={selectedDay}
-              onSelectDay={onSelectDay}
-            />
-          ))}
-        </div>
+    <div className="pb-1">
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium text-muted-foreground sm:gap-1 sm:text-xs">
+        {weekdayLabels.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
+        {cells.map((cell, index) => (
+          <DayCell
+            key={cell.dayKey ?? `empty-${index}`}
+            cell={cell}
+            byDay={byDay}
+            selectedDay={selectedDay}
+            onSelectDay={onSelectDay}
+          />
+        ))}
       </div>
     </div>
   );
@@ -276,16 +274,16 @@ export function CalendarMonth({ monthKey, byDay, selectedDay, onSelectDay }: Cal
   const year = Number(monthKey.slice(0, 4));
 
   return (
-    <section className="rounded-lg bg-card p-4 shadow-sm sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="rounded-3xl border border-latte bg-white p-3 shadow-sm shadow-amber-900/5 sm:p-4">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-base font-semibold">Lịch giao dịch</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-base font-semibold text-mocha">Lịch giao dịch</p>
+          <p className="text-xs text-caramel">
             Chấm đỏ là chi, chấm xanh là thu.
           </p>
         </div>
         <Tabs value={view} onValueChange={(value) => setView(value as CalendarView)}>
-          <TabsList className="grid h-auto w-full grid-cols-3 rounded-lg bg-muted/70 p-1 sm:w-auto">
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl bg-amber-100/80 p-1 sm:w-auto">
             <TabsTrigger value="week">Tuần</TabsTrigger>
             <TabsTrigger value="month">Tháng</TabsTrigger>
             <TabsTrigger value="year">Năm</TabsTrigger>

@@ -3,6 +3,7 @@ export type TransactionDTO = {
   date: string;
   type: "expense" | "income";
   amount: number;
+  categoryId?: string;
   category: string;
   desc: string;
   source?: string;
@@ -32,4 +33,38 @@ export type BillDTO = {
 export type SettingsDTO = {
   paydayDay: number;
   salaryExpected: number;
+};
+
+export type CategoryDTO = {
+  id: string;
+  name: string;
+  icon: string;
+  categoryType: "expense" | "income";
+  kind: "system" | "custom";
+};
+
+export type BudgetAlertDTO = {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  spent: number;
+  amountLimit: number;
+  remaining: number;
+  ratio: number;
+  period: "weekly" | "monthly" | "yearly";
+  periodLabel: string;
+};
+
+export type BudgetDTO = {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  amountLimit: number;
+  spent: number;
+  remaining: number;
+  ratio: number;
+  period: "weekly" | "monthly" | "yearly";
+  periodLabel: string;
 };

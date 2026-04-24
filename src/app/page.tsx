@@ -8,22 +8,29 @@ import { DayPanel } from "@/components/dashboard/DayPanel";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { BillsInWindow } from "@/components/dashboard/BillsInWindow";
 import { AnalyticsSection } from "@/components/dashboard/AnalyticsSection";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { BudgetAlertsBanner } from "@/components/dashboard/BudgetAlertsBanner";
+import { TransactionComposer } from "@/components/dashboard/TransactionComposer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { addMonths, monthKey, toYmd } from "@/lib/domain/date";
 import { payrollWindow } from "@/lib/domain/payroll";
 import { reserveInWindow } from "@/lib/domain/reserve";
 import type { TransactionInput } from "@/lib/domain/transactions";
-import type { BillDTO, SettingsDTO, TransactionDTO } from "@/lib/types";
+import type { BillDTO, BudgetAlertDTO, SettingsDTO, TransactionDTO } from "@/lib/types";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN").format(value);
+
+const formatMonthLabel = (value: string) => {
+  const [yearValue, monthValue] = value.split("-");
+  return `Tháng ${monthValue}/${yearValue}`;
+};
 
 export default function HomePage() {
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [selectedDay, setSelectedDay] = useState(() => toYmd(new Date()));
   const [transactions, setTransactions] = useState<TransactionDTO[]>([]);
   const [bills, setBills] = useState<BillDTO[]>([]);
+  const [budgetAlerts, setBudgetAlerts] = useState<BudgetAlertDTO[]>([]);
   const [settings, setSettings] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
   const year = Number(month.slice(0, 4));
 
@@ -54,15 +61,32 @@ export default function HomePage() {
     return data as SettingsDTO;
   }, []);
 
+  const fetchBudgetAlerts = useCallback(async () => {
+    const response = await fetch("/api/budgets/alerts", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Không thể tải cảnh báo ngân sách.");
+    }
+    const data = await response.json();
+    return (data.items ?? []) as BudgetAlertDTO[];
+  }, []);
+
   const loadYear = useCallback(async (targetYear: number) => {
-    setTransactions(await fetchYear(targetYear));
-  }, [fetchYear]);
+    const [yearTransactions, alerts] = await Promise.all([
+      fetchYear(targetYear),
+      fetchBudgetAlerts(),
+    ]);
+    setTransactions(yearTransactions);
+    setBudgetAlerts(alerts);
+  }, [fetchBudgetAlerts, fetchYear]);
 
   useEffect(() => {
     let ignore = false;
 
     const loadInitialData = async () => {
-      const [settingsData, billsData] = await Promise.all([fetchSettings(), fetchBills()]);
+      const [settingsData, billsData] = await Promise.all([
+        fetchSettings(),
+        fetchBills(),
+      ]);
       if (ignore) {
         return;
       }
@@ -81,9 +105,10 @@ export default function HomePage() {
     let ignore = false;
 
     const loadSelectedYear = async () => {
-      const items = await fetchYear(year);
+      const [items, alerts] = await Promise.all([fetchYear(year), fetchBudgetAlerts()]);
       if (!ignore) {
         setTransactions(items);
+        setBudgetAlerts(alerts);
       }
     };
 
@@ -92,7 +117,7 @@ export default function HomePage() {
     return () => {
       ignore = true;
     };
-  }, [fetchYear, year]);
+  }, [fetchBudgetAlerts, fetchYear, year]);
 
   const monthTransactions = useMemo(
     () => transactions.filter((item) => item.date.startsWith(month)),
@@ -155,6 +180,7 @@ export default function HomePage() {
   );
 
   const payrollLabel = `${toYmd(payroll.lastPay)} → ${toYmd(payroll.nextPay)}`;
+  const monthLabel = formatMonthLabel(month);
 
   const handleMonthChange = (delta: number) => {
     const next = addMonths(month, delta);
@@ -197,73 +223,95 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-semibold lg:w-auto">
-            <Button
-              className="w-full px-2 sm:px-3"
-              variant="outline"
-              size="sm"
-              onClick={() => handleMonthChange(-1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Trước
-            </Button>
-            <span className="px-2 text-center text-base font-semibold tabular-nums">{month}</span>
-            <Button
-              className="w-full px-2 sm:px-3"
-              variant="outline"
-              size="sm"
-              onClick={() => handleMonthChange(1)}
-            >
-              Sau
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground lg:text-right">
-            <span className="font-semibold text-foreground">Kỳ lương:</span> {payrollLabel}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <header className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-mocha sm:text-xl">IN-OUT Tracker</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1 rounded-full border border-latte bg-white px-1.5 py-1 shadow-sm shadow-amber-900/5">
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-caramel transition-colors hover:bg-cream"
+            onClick={() => handleMonthChange(-1)}
+            aria-label="Tháng trước"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-[112px] text-center text-sm font-semibold text-mocha tabular-nums sm:min-w-[132px]">
+            {monthLabel}
+          </span>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-caramel transition-colors hover:bg-cream"
+            onClick={() => handleMonthChange(1)}
+            aria-label="Tháng sau"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+
+      <BudgetAlertsBanner alerts={budgetAlerts} />
 
       <SummaryCards
         monthSummary={monthSummary}
         reserveTotal={reserve.total}
         salaryExpected={settings.salaryExpected}
+        payrollLabel={payrollLabel}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-6">
-          <CalendarMonth
+      <Tabs defaultValue="calendar" className="space-y-3">
+        <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl bg-amber-100/80 p-1">
+          <TabsTrigger value="calendar">Lịch</TabsTrigger>
+          <TabsTrigger value="analytics">Phân tích</TabsTrigger>
+          <TabsTrigger value="bills">Sắp đến hạn</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendar" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <CalendarMonth
+              monthKey={month}
+              byDay={byDay}
+              selectedDay={selectedDay}
+              onSelectDay={handleSelectDay}
+            />
+            <DayPanel
+              dayKey={selectedDay}
+              items={dayItems}
+              daySummary={daySummary}
+              onReload={() => {
+                void loadYear(year);
+              }}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AnalyticsSection
             monthKey={month}
-            byDay={byDay}
-            selectedDay={selectedDay}
-            onSelectDay={handleSelectDay}
+            transactions={monthTransactions}
+            monthSummary={monthSummary}
           />
-          <BillsInWindow bills={reserve.items} reserveTotal={reserve.total} />
-        </div>
-        <DayPanel
-          dayKey={selectedDay}
-          items={dayItems}
-          daySummary={daySummary}
-          onQuickAdd={handleQuickAdd}
-          onManualAdd={handleManualAdd}
-          onReload={() => {
-            void loadYear(year);
-          }}
-        />
-      </div>
+        </TabsContent>
 
-      <AnalyticsSection
-        monthKey={month}
-        transactions={monthTransactions}
-        monthSummary={monthSummary}
-      />
+        <TabsContent value="bills">
+          <BillsInWindow bills={reserve.items} reserveTotal={reserve.total} />
+        </TabsContent>
+      </Tabs>
 
       <div className="text-xs text-muted-foreground">
         Tổng giao dịch trong tháng: {formatCurrency(monthSummary.expense + monthSummary.income)}
       </div>
+
+      <TransactionComposer
+        dayKey={selectedDay}
+        onQuickAdd={handleQuickAdd}
+        onManualAdd={handleManualAdd}
+        onReload={() => {
+          void loadYear(year);
+        }}
+        variant="fab"
+      />
     </div>
   );
 }

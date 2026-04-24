@@ -8,17 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { TransactionComposer } from "@/components/dashboard/TransactionComposer";
 import { transactionSchema } from "@/lib/domain/transactions";
-import type { TransactionInput } from "@/lib/domain/transactions";
-import { TransactionDTO } from "@/lib/types";
+import type { TransactionDTO } from "@/lib/types";
 
 export type DayPanelProps = {
   dayKey: string;
   items: TransactionDTO[];
   daySummary: { income: number; expense: number; net: number };
-  onQuickAdd: (raw: string) => Promise<{ added: number; skipped: string[] }>;
-  onManualAdd: (payload: TransactionInput) => Promise<void>;
   onReload: () => void;
 };
 
@@ -29,8 +25,6 @@ export function DayPanel({
   dayKey,
   items,
   daySummary,
-  onQuickAdd,
-  onManualAdd,
   onReload,
 }: DayPanelProps) {
   const [filter, setFilter] = useState<"all" | "expense" | "income">("all");
@@ -160,44 +154,43 @@ export function DayPanel({
   };
 
   return (
-    <Card className="h-full">
-      <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
-        <CardTitle className="text-lg">{dayKey}</CardTitle>
+    <Card className="h-full rounded-3xl border border-latte bg-white shadow-sm shadow-amber-900/5">
+      <CardHeader className="flex flex-row items-start justify-between gap-3 p-4 pb-2">
+        <div>
+          <CardTitle className="text-base text-mocha sm:text-lg">{dayKey}</CardTitle>
+          <p className="mt-1 text-xs text-caramel">Chi tiết giao dịch trong ngày đã chọn</p>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-5 p-4 pt-0 sm:space-y-6 sm:p-6 sm:pt-0">
-        <div className="grid gap-3 rounded-lg bg-muted/40 p-3 text-sm min-[420px]:grid-cols-3 sm:p-4">
+      <CardContent className="space-y-4 p-4 pt-0">
+        <div className="grid gap-2 rounded-2xl bg-cream p-3 text-sm min-[420px]:grid-cols-3">
           <div className="min-w-0">
-            <p className="text-xs uppercase text-muted-foreground">Ra</p>
-            <p className="mt-1 break-words text-sm font-semibold text-rose-600 sm:text-base">
+            <p className="text-[11px] uppercase tracking-wide text-caramel">Ra</p>
+            <p className="mt-1 break-words text-sm font-semibold text-status-expense sm:text-base">
               {formatCurrency(daySummary.expense)}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="text-xs uppercase text-muted-foreground">Vào</p>
-            <p className="mt-1 break-words text-sm font-semibold text-emerald-600 sm:text-base">
+            <p className="text-[11px] uppercase tracking-wide text-caramel">Vào</p>
+            <p className="mt-1 break-words text-sm font-semibold text-status-income sm:text-base">
               {formatCurrency(daySummary.income)}
             </p>
           </div>
           <div className="min-w-0">
-            <p className="text-xs uppercase text-muted-foreground">Ròng</p>
-            <p className="mt-1 break-words text-sm font-semibold text-foreground sm:text-base">
+            <p className="text-[11px] uppercase tracking-wide text-caramel">Ròng</p>
+            <p className="mt-1 break-words text-sm font-semibold text-mocha sm:text-base">
               {formatCurrency(daySummary.net)}
             </p>
           </div>
         </div>
 
-        <TransactionComposer
-          dayKey={dayKey}
-          onQuickAdd={onQuickAdd}
-          onManualAdd={onManualAdd}
-          onReload={onReload}
-        />
-
         <div className="space-y-3">
-          <p className="text-sm font-semibold">Giao dịch trong ngày</p>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-mocha">Giao dịch trong ngày</p>
+            <p className="text-xs text-caramel">{filtered.length} mục</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
             <Button
-              className="w-full sm:w-auto"
+              className="w-full rounded-full"
               size="sm"
               variant={filter === "all" ? "default" : "outline"}
               onClick={() => setFilter("all")}
@@ -205,7 +198,7 @@ export function DayPanel({
               Tất cả
             </Button>
             <Button
-              className="w-full sm:w-auto"
+              className="w-full rounded-full"
               size="sm"
               variant={filter === "expense" ? "default" : "outline"}
               onClick={() => setFilter("expense")}
@@ -213,7 +206,7 @@ export function DayPanel({
               Chi tiêu
             </Button>
             <Button
-              className="w-full sm:w-auto"
+              className="w-full rounded-full"
               size="sm"
               variant={filter === "income" ? "default" : "outline"}
               onClick={() => setFilter("income")}
@@ -224,54 +217,60 @@ export function DayPanel({
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="Tìm nhanh..."
-              className="col-span-3 h-10 w-full sm:w-56"
+              className="col-span-3 h-11 rounded-2xl"
             />
           </div>
-          <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1 md:max-h-[520px]">
-            {filtered.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col gap-3 rounded-lg border bg-background px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="flex min-w-0 items-start gap-3">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
-                      item.type === "income" ? "bg-emerald-500" : "bg-rose-500"
-                    }`}
-                  >
-                    {item.type === "income" ? (
-                      <ArrowUpRight className="h-4 w-4" />
-                    ) : (
-                      <ArrowDownRight className="h-4 w-4" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-semibold">
-                      {item.desc} - {formatCurrency(item.amount)}
-                    </p>
-                    <p className="break-words text-xs text-muted-foreground">
-                      {item.category} {item.source ? `• ${item.source}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(item.createdAt).toLocaleTimeString("vi-VN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                  <Button
-                    className="w-auto sm:w-full"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => openEdit(item)}
-                  >
-                    Xem/Sửa
-                  </Button>
-                </div>
+          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1 md:max-h-[520px]">
+            {filtered.length === 0 ? (
+              <div className="rounded-2xl bg-cream px-4 py-5 text-center text-sm text-caramel">
+                Chưa có giao dịch phù hợp cho ngày này.
               </div>
-            ))}
+            ) : (
+              filtered.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-latte bg-cream px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
+                        item.type === "income" ? "bg-emerald-500" : "bg-orange-400"
+                      }`}
+                    >
+                      {item.type === "income" ? (
+                        <ArrowUpRight className="h-4 w-4" />
+                      ) : (
+                        <ArrowDownRight className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold text-mocha">
+                        {item.desc} - {formatCurrency(item.amount)}
+                      </p>
+                      <p className="break-words text-xs text-caramel">
+                        {item.category} {item.source ? `• ${item.source}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
+                    <p className="text-xs text-caramel">
+                      {new Date(item.createdAt).toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                    <Button
+                      className="w-auto rounded-full sm:w-full"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEdit(item)}
+                    >
+                      Xem/Sửa
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </CardContent>

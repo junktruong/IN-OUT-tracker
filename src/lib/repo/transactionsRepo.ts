@@ -13,6 +13,7 @@ export type NewTransaction = {
   date: Date;
   type: "expense" | "income";
   amount: number;
+  categoryId?: string;
   category: string;
   desc: string;
   source?: string;
@@ -25,6 +26,7 @@ export type TransactionUpdate = {
   date: Date;
   type: "expense" | "income";
   amount: number;
+  categoryId?: string;
   category: string;
   desc: string;
   source?: string;
@@ -97,6 +99,7 @@ export const updateTransactionById = async (
       date: normalizeDate(payload.date),
       type: payload.type,
       amount: payload.amount,
+      categoryId: payload.categoryId,
       category: payload.category,
       desc: payload.desc,
       source: payload.source,

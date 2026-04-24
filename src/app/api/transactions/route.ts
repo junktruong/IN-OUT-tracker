@@ -38,6 +38,7 @@ export async function GET(request: Request) {
     date: toYmd(new Date(item.date)),
     type: item.type,
     amount: item.amount,
+    categoryId: item.categoryId,
     category: item.category,
     desc: item.desc,
     source: item.source,

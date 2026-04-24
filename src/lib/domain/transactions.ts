@@ -4,6 +4,7 @@ export const transactionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   type: z.enum(["expense", "income"]),
   amount: z.number().positive(),
+  categoryId: z.string().optional(),
   category: z.string().min(1),
   desc: z.string().min(1),
   source: z.string().optional(),
