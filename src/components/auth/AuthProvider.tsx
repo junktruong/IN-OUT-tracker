@@ -79,6 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const cachedUser = readCachedUser();
+    if (cachedUser) {
+      setUser(cachedUser);
+      setLoading(false);
+    }
+
     void refresh();
   }, [refresh]);
 

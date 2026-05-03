@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { InstallPwaButton } from "@/components/app/InstallPwaButton";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +88,15 @@ export default function SettingsPage() {
           >
             Đăng xuất
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-3xl border border-latte bg-white shadow-sm shadow-amber-900/5">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-lg text-mocha">Ứng dụng</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4 pt-0">
+          <InstallPwaButton />
         </CardContent>
       </Card>
 

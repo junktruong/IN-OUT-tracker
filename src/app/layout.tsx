@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PwaRegistrar } from "@/components/app/PwaRegistrar";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
@@ -19,6 +20,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "IN-OUT Tracker",
   description: "Theo dõi thu chi và kỳ lương",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "IN-OUT Tracker",
+  },
+  icons: {
+    icon: "/pwa-icon.svg",
+    apple: "/pwa-icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -30,6 +41,7 @@ export default function RootLayout({
     <html lang="vi">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
+          <PwaRegistrar />
           <div className="min-h-screen bg-cream text-mocha">
             <main className="mx-auto w-full max-w-6xl px-4 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32">
               <AuthGate>{children}</AuthGate>
