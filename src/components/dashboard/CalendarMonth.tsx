@@ -124,9 +124,11 @@ function DayCell({
       type="button"
       onClick={() => onSelectDay(cell.dayKey!)}
       className={cn(
-        "flex min-w-0 flex-col items-start justify-between rounded-xl px-1 py-1 text-left transition hover:bg-muted sm:px-2 sm:py-2",
+        "flex min-w-0 flex-col items-start justify-between rounded-xl border border-transparent px-1 py-1 text-left transition sm:px-2 sm:py-2",
         compact ? "h-8 text-[10px]" : "h-11 text-[11px] sm:h-20 sm:text-xs",
-        isSelected && "bg-foreground text-background hover:bg-foreground",
+        isSelected &&
+          "border-honey bg-amber-100 text-mocha shadow-sm shadow-amber-900/10 ring-1 ring-honey/35 hover:bg-amber-100",
+        !isSelected && "hover:bg-muted",
         !isSelected && hasActivity && "bg-background"
       )}
     >
@@ -139,7 +141,7 @@ function DayCell({
           <span
             className={cn(
               "hidden truncate text-[10px] tabular-nums sm:inline",
-              isSelected ? "text-background/80" : net >= 0 ? "text-emerald-600" : "text-rose-600"
+              isSelected ? "text-caramel" : net >= 0 ? "text-emerald-600" : "text-rose-600"
             )}
           >
             {compactCurrency(Math.abs(net))}
