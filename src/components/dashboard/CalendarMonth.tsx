@@ -237,34 +237,51 @@ function YearView({
       }),
     [year]
   );
+  const activeMonth = selectedDay.slice(0, 7);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {months.map((key, index) => (
-        <div key={key} className="space-y-2 rounded-lg bg-background/70 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">{monthLabels[index]}</p>
-            <p className="text-xs text-muted-foreground">{year}</p>
+      {months.map((key, index) => {
+        const isActiveMonth = key === activeMonth;
+
+        return (
+          <div
+            key={key}
+            className={cn(
+              "space-y-2 rounded-2xl border p-3 transition-colors",
+              isActiveMonth
+                ? "border-honey bg-amber-50/90 shadow-sm shadow-amber-900/10 ring-1 ring-honey/35"
+                : "border-latte bg-background/70"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <p className={cn("text-sm font-semibold", isActiveMonth ? "text-mocha" : "text-foreground")}>
+                {monthLabels[index]}
+              </p>
+              <p className={cn("text-xs", isActiveMonth ? "text-caramel" : "text-muted-foreground")}>
+                {year}
+              </p>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-muted-foreground">
+              {weekdayLabels.map((label) => (
+                <span key={label}>{label}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {buildMonthCells(key).map((cell, cellIndex) => (
+                <DayCell
+                  key={cell.dayKey ?? `${key}-${cellIndex}`}
+                  cell={cell}
+                  byDay={byDay}
+                  selectedDay={selectedDay}
+                  onSelectDay={onSelectDay}
+                  compact
+                />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-muted-foreground">
-            {weekdayLabels.map((label) => (
-              <span key={label}>{label}</span>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {buildMonthCells(key).map((cell, cellIndex) => (
-              <DayCell
-                key={cell.dayKey ?? `${key}-${cellIndex}`}
-                cell={cell}
-                byDay={byDay}
-                selectedDay={selectedDay}
-                onSelectDay={onSelectDay}
-                compact
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
