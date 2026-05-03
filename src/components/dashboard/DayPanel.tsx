@@ -8,14 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { transactionSchema } from "@/lib/domain/transactions";
+import { transactionSchema, type TransactionInput } from "@/lib/domain/transactions";
 import type { TransactionDTO } from "@/lib/types";
 
 export type DayPanelProps = {
   dayKey: string;
   items: TransactionDTO[];
   daySummary: { income: number; expense: number; net: number };
-  onReload: () => void;
+  onUpdateItem: (id: string, payload: TransactionInput) => Promise<void>;
+  onDeleteItem: (id: string) => Promise<void>;
 };
 
 const formatCurrency = (value: number) =>
@@ -25,7 +26,8 @@ export function DayPanel({
   dayKey,
   items,
   daySummary,
-  onReload,
+  onUpdateItem,
+  onDeleteItem,
 }: DayPanelProps) {
   const [filter, setFilter] = useState<"all" | "expense" | "income">("all");
   const [keyword, setKeyword] = useState("");
@@ -109,17 +111,9 @@ export function DayPanel({
     }
     setSaving(true);
     try {
-      const response = await fetch(`/api/transactions/${editing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parse.data),
-      });
-      if (!response.ok) {
-        throw new Error("failed");
-      }
+      await onUpdateItem(editing.id, parse.data);
       toast.success("Đã cập nhật giao dịch.");
       setEditing(null);
-      onReload();
     } catch {
       toast.error("Không thể cập nhật giao dịch.");
     } finally {
@@ -137,15 +131,9 @@ export function DayPanel({
     }
     setSaving(true);
     try {
-      const response = await fetch(`/api/transactions/${editing.id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        throw new Error("failed");
-      }
+      await onDeleteItem(editing.id);
       toast.success("Đã xoá giao dịch.");
       setEditing(null);
-      onReload();
     } catch {
       toast.error("Không thể xoá giao dịch.");
     } finally {
@@ -250,6 +238,14 @@ export function DayPanel({
                       <p className="break-words text-xs text-caramel">
                         {item.category} {item.source ? `• ${item.source}` : ""}
                       </p>
+                      {item.syncStatus && item.syncStatus !== "synced" ? (
+                        <p className="mt-1 text-[11px] font-medium text-caramel">
+                          {item.syncStatus === "pending_create" && "Chờ đẩy lên server"}
+                          {item.syncStatus === "pending_update" && "Chờ cập nhật lên server"}
+                          {item.syncStatus === "pending_delete" && "Chờ xoá trên server"}
+                          {item.syncStatus === "sync_error" && (item.lastSyncError ?? "Đồng bộ sẽ thử lại")}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">

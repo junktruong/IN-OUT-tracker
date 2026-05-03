@@ -12,6 +12,9 @@ import { transactionSchema } from "@/lib/domain/transactions";
 
 const monthQuerySchema = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) });
 const yearQuerySchema = z.object({ year: z.string().regex(/^\d{4}$/) });
+const createTransactionSchema = transactionSchema.extend({
+  clientId: z.string().min(1).optional(),
+});
 
 export async function GET(request: Request) {
   const user = getSessionUserFromRequest(request);
@@ -34,7 +37,9 @@ export async function GET(request: Request) {
   }
 
   const response = items.map((item) => ({
-    id: String(item._id),
+    id: item.clientId ?? String(item._id),
+    clientId: item.clientId ?? String(item._id),
+    serverId: String(item._id),
     date: toYmd(new Date(item.date)),
     type: item.type,
     amount: item.amount,
@@ -46,6 +51,8 @@ export async function GET(request: Request) {
     account: item.account,
     note: item.note,
     createdAt: new Date(item.createdAt).toISOString(),
+    updatedAt: new Date(item.updatedAt ?? item.createdAt).toISOString(),
+    syncStatus: "synced" as const,
   }));
 
   return NextResponse.json({ items: response });
@@ -58,7 +65,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const parse = transactionSchema.safeParse(body);
+  const parse = createTransactionSchema.safeParse(body);
 
   if (!parse.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
@@ -72,5 +79,9 @@ export async function POST(request: Request) {
     },
   ]);
 
-  return NextResponse.json({ id: String(created._id) });
+  return NextResponse.json({
+    id: created.clientId ?? String(created._id),
+    clientId: created.clientId ?? String(created._id),
+    serverId: String(created._id),
+  });
 }

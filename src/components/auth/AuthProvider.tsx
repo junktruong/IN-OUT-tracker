@@ -12,6 +12,8 @@ import type { ReactNode } from "react";
 
 import type { AuthUser } from "@/lib/auth/types";
 
+const AUTH_CACHE_KEY = "inout_auth_user";
+
 type AuthContextValue = {
   loading: boolean;
   user: AuthUser | null;
@@ -20,6 +22,32 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const readCachedUser = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(AUTH_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedUser = (user: AuthUser | null) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!user) {
+    window.localStorage.removeItem(AUTH_CACHE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(user));
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -30,13 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch("/api/auth/me", { cache: "no-store" });
       if (!response.ok) {
         setUser(null);
+        writeCachedUser(null);
         return;
       }
 
       const data = (await response.json()) as { user: AuthUser | null };
       setUser(data.user);
+      writeCachedUser(data.user);
     } catch {
-      setUser(null);
+      setUser(readCachedUser());
     } finally {
       setLoading(false);
     }
@@ -45,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    writeCachedUser(null);
   }, []);
 
   useEffect(() => {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { useAuth } from "@/components/auth/AuthProvider";
 import { CalendarMonth } from "@/components/dashboard/CalendarMonth";
 import { DayPanel } from "@/components/dashboard/DayPanel";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
@@ -11,6 +12,7 @@ import { AnalyticsSection } from "@/components/dashboard/AnalyticsSection";
 import { BudgetAlertsBanner } from "@/components/dashboard/BudgetAlertsBanner";
 import { TransactionComposer } from "@/components/dashboard/TransactionComposer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTransactionsLocalFirst } from "@/hooks/useTransactionsLocalFirst";
 import { addMonths, monthKey, toYmd } from "@/lib/domain/date";
 import { payrollWindow } from "@/lib/domain/payroll";
 import { reserveInWindow } from "@/lib/domain/reserve";
@@ -26,22 +28,21 @@ const formatMonthLabel = (value: string) => {
 };
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [selectedDay, setSelectedDay] = useState(() => toYmd(new Date()));
-  const [transactions, setTransactions] = useState<TransactionDTO[]>([]);
   const [bills, setBills] = useState<BillDTO[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<BudgetAlertDTO[]>([]);
   const [settings, setSettings] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
   const year = Number(month.slice(0, 4));
-
-  const fetchYear = useCallback(async (targetYear: number) => {
-    const response = await fetch(`/api/transactions?year=${targetYear}`);
-    if (!response.ok) {
-      throw new Error("Không thể tải giao dịch.");
-    }
-    const data = await response.json();
-    return (data.items ?? []) as TransactionDTO[];
-  }, []);
+  const {
+    transactions,
+    syncState,
+    createTransaction,
+    createTransactionsFromQuickInput,
+    updateTransaction,
+    deleteTransaction,
+  } = useTransactionsLocalFirst(user?.id, year);
 
   const fetchBills = useCallback(async () => {
     const response = await fetch("/api/bills");
@@ -70,28 +71,38 @@ export default function HomePage() {
     return (data.items ?? []) as BudgetAlertDTO[];
   }, []);
 
-  const loadYear = useCallback(async (targetYear: number) => {
-    const [yearTransactions, alerts] = await Promise.all([
-      fetchYear(targetYear),
-      fetchBudgetAlerts(),
-    ]);
-    setTransactions(yearTransactions);
-    setBudgetAlerts(alerts);
-  }, [fetchBudgetAlerts, fetchYear]);
+  const refreshBudgetAlerts = useCallback(async () => {
+    try {
+      const alerts = await fetchBudgetAlerts();
+      setBudgetAlerts(alerts);
+    } catch {
+      setBudgetAlerts([]);
+    }
+  }, [fetchBudgetAlerts]);
 
   useEffect(() => {
     let ignore = false;
 
     const loadInitialData = async () => {
-      const [settingsData, billsData] = await Promise.all([
+      const [settingsResult, billsResult, alertsResult] = await Promise.allSettled([
         fetchSettings(),
         fetchBills(),
+        fetchBudgetAlerts(),
       ]);
+
       if (ignore) {
         return;
       }
-      setSettings(settingsData);
-      setBills(billsData);
+
+      if (settingsResult.status === "fulfilled") {
+        setSettings(settingsResult.value);
+      }
+      if (billsResult.status === "fulfilled") {
+        setBills(billsResult.value);
+      }
+      if (alertsResult.status === "fulfilled") {
+        setBudgetAlerts(alertsResult.value);
+      }
     };
 
     void loadInitialData();
@@ -99,25 +110,7 @@ export default function HomePage() {
     return () => {
       ignore = true;
     };
-  }, [fetchBills, fetchSettings]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadSelectedYear = async () => {
-      const [items, alerts] = await Promise.all([fetchYear(year), fetchBudgetAlerts()]);
-      if (!ignore) {
-        setTransactions(items);
-        setBudgetAlerts(alerts);
-      }
-    };
-
-    void loadSelectedYear();
-
-    return () => {
-      ignore = true;
-    };
-  }, [fetchBudgetAlerts, fetchYear, year]);
+  }, [fetchBills, fetchBudgetAlerts, fetchSettings]);
 
   const monthTransactions = useMemo(
     () => transactions.filter((item) => item.date.startsWith(month)),
@@ -199,27 +192,14 @@ export default function HomePage() {
   };
 
   const handleQuickAdd = async (raw: string) => {
-    const response = await fetch("/api/transactions/quick", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: selectedDay, raw }),
-    });
-    if (!response.ok) {
-      throw new Error("Không thể thêm giao dịch.");
-    }
-    const data = await response.json();
-    return data;
+    const result = await createTransactionsFromQuickInput(selectedDay, raw);
+    void refreshBudgetAlerts();
+    return result;
   };
 
   const handleManualAdd = async (payload: TransactionInput) => {
-    const response = await fetch("/api/transactions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error("Không thể thêm giao dịch.");
-    }
+    await createTransaction(payload);
+    void refreshBudgetAlerts();
   };
 
   return (
@@ -227,6 +207,13 @@ export default function HomePage() {
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-lg font-semibold text-mocha sm:text-xl">IN-OUT Tracker</p>
+          <p className="mt-1 text-xs text-caramel">
+            {syncState.syncing
+              ? "Đang đồng bộ giao dịch..."
+              : syncState.pendingCount > 0
+                ? `${syncState.pendingCount} thay đổi chờ đồng bộ`
+                : "Dữ liệu giao dịch đã đồng bộ"}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded-full border border-latte bg-white px-1.5 py-1 shadow-sm shadow-amber-900/5">
           <button
@@ -279,8 +266,13 @@ export default function HomePage() {
               dayKey={selectedDay}
               items={dayItems}
               daySummary={daySummary}
-              onReload={() => {
-                void loadYear(year);
+              onUpdateItem={async (id, payload) => {
+                await updateTransaction(id, payload);
+                void refreshBudgetAlerts();
+              }}
+              onDeleteItem={async (id) => {
+                await deleteTransaction(id);
+                void refreshBudgetAlerts();
               }}
             />
           </div>
@@ -308,7 +300,7 @@ export default function HomePage() {
         onQuickAdd={handleQuickAdd}
         onManualAdd={handleManualAdd}
         onReload={() => {
-          void loadYear(year);
+          void refreshBudgetAlerts();
         }}
         variant="fab"
       />

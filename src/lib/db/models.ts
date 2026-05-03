@@ -5,6 +5,12 @@ import { categoryKinds, categoryTypes } from "@/lib/domain/categories";
 const transactionSchema = new Schema(
   {
     userId: { type: String, required: true, index: true },
+    clientId: {
+      type: String,
+      required: true,
+      index: true,
+      default: () => new mongoose.Types.ObjectId().toString(),
+    },
     date: { type: Date, required: true, index: true },
     type: { type: String, enum: ["expense", "income"], required: true },
     amount: { type: Number, required: true },
@@ -16,11 +22,16 @@ const transactionSchema = new Schema(
     account: { type: String },
     note: { type: String },
     createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );
 
 transactionSchema.index({ userId: 1, date: 1 });
+transactionSchema.index(
+  { userId: 1, clientId: 1 },
+  { unique: true, partialFilterExpression: { clientId: { $exists: true } } }
+);
 
 const billSchema = new Schema(
   {
@@ -88,6 +99,22 @@ const budgetSchema = new Schema(
 
 budgetSchema.index({ userId: 1, categoryId: 1, period: 1 }, { unique: true });
 
+const syncOperationSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    entityType: { type: String, required: true, index: true },
+    mutationType: { type: String, required: true, index: true },
+    operationId: { type: String, required: true, index: true },
+    clientId: { type: String },
+    serverId: { type: String },
+    status: { type: String, required: true, default: "applied" },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { versionKey: false }
+);
+
+syncOperationSchema.index({ userId: 1, operationId: 1 }, { unique: true });
+
 const userSchema = new Schema(
   {
     googleId: { type: String, required: true, unique: true, index: true },
@@ -105,6 +132,7 @@ type Bill = InferSchemaType<typeof billSchema>;
 type Settings = InferSchemaType<typeof settingsSchema>;
 type Category = InferSchemaType<typeof categorySchema>;
 type Budget = InferSchemaType<typeof budgetSchema>;
+type SyncOperation = InferSchemaType<typeof syncOperationSchema>;
 type User = InferSchemaType<typeof userSchema>;
 
 const TransactionModel: Model<Transaction> =
@@ -123,6 +151,9 @@ const CategoryModel: Model<Category> =
 const BudgetModel: Model<Budget> =
   mongoose.models.Budget || mongoose.model("Budget", budgetSchema);
 
+const SyncOperationModel: Model<SyncOperation> =
+  mongoose.models.SyncOperation || mongoose.model("SyncOperation", syncOperationSchema);
+
 const UserModel: Model<User> =
   mongoose.models.User || mongoose.model("User", userSchema);
 
@@ -132,6 +163,7 @@ export {
   SettingsModel,
   CategoryModel,
   BudgetModel,
+  SyncOperationModel,
   UserModel,
 };
-export type { Transaction, Bill, Settings, Category, Budget, User };
+export type { Transaction, Bill, Settings, Category, Budget, SyncOperation, User };

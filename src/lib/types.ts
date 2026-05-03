@@ -1,5 +1,14 @@
+export type TransactionSyncStatus =
+  | "synced"
+  | "pending_create"
+  | "pending_update"
+  | "pending_delete"
+  | "sync_error";
+
 export type TransactionDTO = {
   id: string;
+  clientId?: string;
+  serverId?: string;
   date: string;
   type: "expense" | "income";
   amount: number;
@@ -11,6 +20,9 @@ export type TransactionDTO = {
   account?: string;
   note?: string;
   createdAt: string;
+  updatedAt?: string;
+  syncStatus?: TransactionSyncStatus;
+  lastSyncError?: string;
 };
 
 export type BillDTO = {

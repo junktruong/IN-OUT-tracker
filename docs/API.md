@@ -143,7 +143,9 @@ Can mot trong hai:
 {
   "items": [
     {
-      "id": "txn_id",
+      "id": "client_tx_id",
+      "clientId": "client_tx_id",
+      "serverId": "txn_id",
       "date": "2026-04-24",
       "type": "expense",
       "amount": 45000,
@@ -154,7 +156,9 @@ Can mot trong hai:
       "method": "Tien mat",
       "account": "Vi",
       "note": "Bua trua",
-      "createdAt": "2026-04-24T04:00:00.000Z"
+      "createdAt": "2026-04-24T04:00:00.000Z",
+      "updatedAt": "2026-04-24T04:00:00.000Z",
+      "syncStatus": "synced"
     }
   ]
 }
@@ -181,6 +185,7 @@ Them 1 giao dich theo form nhap chi tiet.
 
 ```json
 {
+  "clientId": "client_tx_id_optional",
   "date": "2026-04-24",
   "type": "expense",
   "amount": 45000,
@@ -197,7 +202,11 @@ Them 1 giao dich theo form nhap chi tiet.
 #### Success
 
 ```json
-{ "id": "txn_id" }
+{
+  "id": "client_tx_id",
+  "clientId": "client_tx_id",
+  "serverId": "txn_id"
+}
 ```
 
 #### Loi
@@ -292,6 +301,89 @@ Xoa 1 giao dich.
 | --- | --- |
 | `401` | `{ "error": "Vui long dang nhap bang Google." }` |
 | `404` | `{ "error": "Khong tim thay giao dich." }` |
+
+---
+
+### POST `/api/sync/transactions`
+
+Dong bo batch giao dich tu local queue len server. Endpoint nay duoc thiet ke cho local-first / offline-first va co idempotency bang `operationId` hoac `clientMutationId`.
+
+#### Auth
+
+- Bat buoc dang nhap
+
+#### Body
+
+```json
+{
+  "operations": [
+    {
+      "operationId": "op-001",
+      "type": "create",
+      "clientId": "client_tx_id",
+      "payload": {
+        "date": "2026-05-03",
+        "type": "expense",
+        "amount": 45000,
+        "category": "An uong",
+        "desc": "Bun bo"
+      }
+    },
+    {
+      "operationId": "op-002",
+      "type": "update",
+      "clientId": "client_tx_id",
+      "payload": {
+        "date": "2026-05-03",
+        "type": "expense",
+        "amount": 50000,
+        "category": "An uong",
+        "desc": "Bun bo them"
+      }
+    },
+    {
+      "operationId": "op-003",
+      "type": "delete",
+      "clientId": "client_tx_id"
+    }
+  ]
+}
+```
+
+#### Rule
+
+- `create` va `update` bat buoc co `payload`
+- `operationId` hoac `clientMutationId` bat buoc co it nhat 1 field
+- `clientId` la dinh danh on dinh do client sinh ra, duoc dung de hop nhat local record va server record
+
+#### Success
+
+```json
+{
+  "results": [
+    {
+      "operationId": "op-001",
+      "clientId": "client_tx_id",
+      "serverId": "txn_id",
+      "status": "applied"
+    }
+  ]
+}
+```
+
+#### `status` meaning
+
+- `applied`: Server vua xu ly thay doi
+- `duplicate`: `operationId` da duoc xu ly truoc do hoac `clientId` create da ton tai
+- `deleted`: Server da xoa giao dich hoac giao dich da khong con ton tai
+
+#### Loi
+
+| HTTP | Body | Khi nao xay ra |
+| --- | --- | --- |
+| `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
+| `400` | `{ "error": "Du lieu sync khong hop le." }` | Batch khong qua validate |
+| `500` | `{ "error": "Khong the dong bo giao dich." }` | Loi xu ly batch o server |
 
 ## Bills APIs
 
