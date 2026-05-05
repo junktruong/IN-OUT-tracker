@@ -73,17 +73,23 @@ const settingsSchema = new Schema(
 const categorySchema = new Schema(
   {
     userId: { type: String, required: true, index: true },
+    clientId: { type: String, index: true },
     name: { type: String, required: true },
     slug: { type: String, required: true, index: true },
     icon: { type: String, required: true, default: "✨" },
     categoryType: { type: String, enum: categoryTypes, required: true, index: true },
     kind: { type: String, enum: categoryKinds, required: true, default: "custom", index: true },
     createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );
 
 categorySchema.index({ userId: 1, slug: 1, categoryType: 1 }, { unique: true });
+categorySchema.index(
+  { userId: 1, clientId: 1 },
+  { unique: true, partialFilterExpression: { clientId: { $exists: true } } }
+);
 
 const budgetSchema = new Schema(
   {

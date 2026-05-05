@@ -1,11 +1,15 @@
 import type { TransactionInput } from "@/lib/domain/transactions";
 import type { TransactionDTO, TransactionSyncStatus } from "@/lib/types";
+import {
+  openOfflineDatabase,
+  toPromise,
+  TRANSACTIONS_STORE,
+  TRANSACTION_SYNC_JOBS_STORE,
+  waitForTransaction,
+} from "@/lib/offline/offlineDb";
 
-const DB_NAME = "inout-tracker-offline";
-const DB_VERSION = 1;
-const TRANSACTIONS_STORE = "transactions";
-const SYNC_JOBS_STORE = "transaction_sync_jobs";
 let storeQueue: Promise<unknown> = Promise.resolve();
+const SYNC_JOBS_STORE = TRANSACTION_SYNC_JOBS_STORE;
 
 type StoredTransaction = TransactionDTO & {
   userId: string;
@@ -38,46 +42,6 @@ type SyncResult = {
   status: "applied" | "duplicate" | "deleted";
 };
 
-const isBrowser = () => typeof window !== "undefined" && "indexedDB" in window;
-
-const toPromise = <T>(request: IDBRequest<T>) =>
-  new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-const waitForTransaction = (transaction: IDBTransaction) =>
-  new Promise<void>((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-
-const openDatabase = () =>
-  new Promise<IDBDatabase>((resolve, reject) => {
-    if (!isBrowser()) {
-      reject(new Error("IndexedDB is not available"));
-      return;
-    }
-
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const database = request.result;
-
-      if (!database.objectStoreNames.contains(TRANSACTIONS_STORE)) {
-        database.createObjectStore(TRANSACTIONS_STORE, { keyPath: "id" });
-      }
-
-      if (!database.objectStoreNames.contains(SYNC_JOBS_STORE)) {
-        database.createObjectStore(SYNC_JOBS_STORE, { keyPath: "operationId" });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
 const runWithStoreQueue = <T>(task: () => Promise<T>) => {
   const next = storeQueue.then(task, task);
   storeQueue = next.then(
@@ -88,7 +52,7 @@ const runWithStoreQueue = <T>(task: () => Promise<T>) => {
 };
 
 const getAllTransactions = async () => {
-  const database = await openDatabase();
+  const database = await openOfflineDatabase();
   const transaction = database.transaction(TRANSACTIONS_STORE, "readonly");
   const store = transaction.objectStore(TRANSACTIONS_STORE);
   const items = await toPromise(store.getAll() as IDBRequest<StoredTransaction[]>);
@@ -98,7 +62,7 @@ const getAllTransactions = async () => {
 };
 
 const getAllSyncJobs = async () => {
-  const database = await openDatabase();
+  const database = await openOfflineDatabase();
   const transaction = database.transaction(SYNC_JOBS_STORE, "readonly");
   const store = transaction.objectStore(SYNC_JOBS_STORE);
   const items = await toPromise(store.getAll() as IDBRequest<TransactionSyncJob[]>);
@@ -111,7 +75,7 @@ const writeTransactionsAndJobs = async (
   transactions: StoredTransaction[],
   jobs: TransactionSyncJob[]
 ) => {
-  const database = await openDatabase();
+  const database = await openOfflineDatabase();
   const transaction = database.transaction(
     [TRANSACTIONS_STORE, SYNC_JOBS_STORE],
     "readwrite"

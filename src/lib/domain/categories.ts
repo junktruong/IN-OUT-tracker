@@ -29,7 +29,30 @@ export const categorySchema = z.object({
   categoryType: z.enum(categoryTypes),
 });
 
+export const categorySyncOperationSchema = z
+  .object({
+    operationId: z.string().min(1).optional(),
+    clientMutationId: z.string().min(1).optional(),
+    type: z.literal("create"),
+    clientId: z.string().min(1),
+    payload: categorySchema,
+  })
+  .superRefine((value, context) => {
+    if (!value.operationId && !value.clientMutationId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "operationId hoặc clientMutationId là bắt buộc.",
+        path: ["operationId"],
+      });
+    }
+  });
+
+export const categorySyncBatchSchema = z.object({
+  operations: z.array(categorySyncOperationSchema).min(1).max(100),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
+export type CategorySyncOperationInput = z.infer<typeof categorySyncOperationSchema>;
 
 export const toCategorySlug = (value: string) =>
   value

@@ -43,7 +43,15 @@ export const getCategoryById = async (userId: string, id: string) => {
   return CategoryModel.findOne({ _id: id, userId }).lean();
 };
 
-export const createCategory = async (userId: string, payload: CategoryInput) => {
+export const getCategoryByClientId = async (userId: string, clientId: string) => {
+  await ensureDefaultCategories(userId);
+  return CategoryModel.findOne({ userId, clientId }).lean();
+};
+
+export const createCategory = async (
+  userId: string,
+  payload: CategoryInput & { clientId?: string }
+) => {
   await ensureDefaultCategories(userId);
 
   const slug = toCategorySlug(payload.name);
@@ -59,11 +67,13 @@ export const createCategory = async (userId: string, payload: CategoryInput) => 
 
   const created = await CategoryModel.create({
     userId,
+    clientId: payload.clientId,
     name: payload.name.trim(),
     slug,
     icon: payload.icon ?? "✨",
     categoryType: payload.categoryType,
     kind: "custom",
+    updatedAt: new Date(),
   });
 
   return { kind: "created" as const, category: created.toObject() };

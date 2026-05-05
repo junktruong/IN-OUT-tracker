@@ -14,10 +14,16 @@ export async function GET(request: Request) {
   return NextResponse.json({
     items: items.map((item) => ({
       id: String(item._id),
+      clientId: item.clientId,
+      serverId: String(item._id),
       name: item.name,
+      slug: item.slug,
       icon: item.icon,
       categoryType: item.categoryType,
       kind: item.kind,
+      createdAt: item.createdAt?.toISOString?.(),
+      updatedAt: item.updatedAt?.toISOString?.(),
+      syncStatus: "synced" as const,
     })),
   });
 }
@@ -42,6 +48,15 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     id: String(result.category._id),
+    clientId: result.category.clientId,
+    serverId: String(result.category._id),
     name: result.category.name,
+    slug: result.category.slug,
+    icon: result.category.icon,
+    categoryType: result.category.categoryType,
+    kind: result.category.kind,
+    createdAt: result.category.createdAt?.toISOString?.(),
+    updatedAt: result.category.updatedAt?.toISOString?.(),
+    syncStatus: "synced" as const,
   });
 }

@@ -38,6 +38,30 @@ type WizardForm = {
   date: string;
 };
 
+type CategoryCreatorForm = {
+  name: string;
+  icon: string;
+};
+
+const categoryIconOptions = [
+  "🍜",
+  "☕",
+  "🛍️",
+  "🏠",
+  "🚕",
+  "💊",
+  "🎓",
+  "🧾",
+  "✨",
+  "🎉",
+  "⛽",
+  "💼",
+  "🎁",
+  "💳",
+  "💰",
+  "🪙",
+];
+
 const createDefaultWizardForm = (dayKey: string): WizardForm => ({
   type: null,
   amount: "",
@@ -45,6 +69,16 @@ const createDefaultWizardForm = (dayKey: string): WizardForm => ({
   category: "",
   note: "",
   date: dayKey,
+});
+
+const defaultCategoryIcon = (type: "expense" | "income" | null) =>
+  type === "income" ? "💼" : "🍜";
+
+const createDefaultCategoryCreator = (
+  type: "expense" | "income" | null
+): CategoryCreatorForm => ({
+  name: "",
+  icon: defaultCategoryIcon(type),
 });
 
 const stepLabel = (step: WizardStep) => `Bước ${step}/4`;
@@ -63,7 +97,12 @@ export function TransactionComposer({
   const [step, setStep] = useState<WizardStep>(1);
   const [wizard, setWizard] = useState<WizardForm>(() => createDefaultWizardForm(dayKey));
   const [saving, setSaving] = useState(false);
-  const { categories, loading: categoriesLoading } = useCategories(manualOpen);
+  const [showCategoryCreator, setShowCategoryCreator] = useState(false);
+  const [categoryCreator, setCategoryCreator] = useState<CategoryCreatorForm>(() =>
+    createDefaultCategoryCreator(null)
+  );
+  const [savingCategory, setSavingCategory] = useState(false);
+  const { categories, loading: categoriesLoading, createCategory } = useCategories(manualOpen);
 
   const filteredCategories = useMemo(
     () => categories.filter((item) => item.categoryType === (wizard.type ?? "expense")),
@@ -78,6 +117,8 @@ export function TransactionComposer({
   const openManual = () => {
     setMenuOpen(false);
     setWizard(createDefaultWizardForm(dayKey));
+    setShowCategoryCreator(false);
+    setCategoryCreator(createDefaultCategoryCreator(null));
     setStep(1);
     setManualOpen(true);
   };
@@ -131,6 +172,45 @@ export function TransactionComposer({
       toast.error("Không thể thêm giao dịch.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!wizard.type) {
+      toast.error("Vui lòng chọn thu hoặc chi trước.");
+      return;
+    }
+
+    if (!categoryCreator.name.trim()) {
+      toast.error("Vui lòng nhập tên danh mục.");
+      return;
+    }
+
+    setSavingCategory(true);
+    try {
+      const result = await createCategory({
+        name: categoryCreator.name.trim(),
+        icon: categoryCreator.icon.trim() || defaultCategoryIcon(wizard.type),
+        categoryType: wizard.type,
+      });
+
+      setWizard((prev) => ({
+        ...prev,
+        categoryId: result.category.id,
+        category: result.category.name,
+      }));
+      setShowCategoryCreator(false);
+      setCategoryCreator(createDefaultCategoryCreator(wizard.type));
+      setStep(4);
+      toast.success(
+        result.kind === "created"
+          ? "Đã thêm danh mục mới."
+          : "Danh mục đã có sẵn, mình chọn luôn cho giao dịch này."
+      );
+    } catch {
+      toast.error("Không thể thêm danh mục.");
+    } finally {
+      setSavingCategory(false);
     }
   };
 
@@ -219,6 +299,9 @@ export function TransactionComposer({
           setManualOpen(open);
           if (!open) {
             setStep(1);
+            setWizard(createDefaultWizardForm(dayKey));
+            setShowCategoryCreator(false);
+            setCategoryCreator(createDefaultCategoryCreator(null));
           }
         }}
       >
@@ -255,7 +338,9 @@ export function TransactionComposer({
                     type="button"
                     className="rounded-3xl border border-latte bg-white px-5 py-8 text-left shadow-sm shadow-amber-900/5 transition hover:-translate-y-0.5 hover:bg-cream"
                     onClick={() => {
-                      setWizard((prev) => ({ ...prev, type: "income" }));
+                      setWizard((prev) => ({ ...prev, type: "income", categoryId: undefined, category: "" }));
+                      setShowCategoryCreator(false);
+                      setCategoryCreator(createDefaultCategoryCreator("income"));
                       setStep(2);
                     }}
                   >
@@ -267,7 +352,9 @@ export function TransactionComposer({
                     type="button"
                     className="rounded-3xl border border-latte bg-white px-5 py-8 text-left shadow-sm shadow-amber-900/5 transition hover:-translate-y-0.5 hover:bg-cream"
                     onClick={() => {
-                      setWizard((prev) => ({ ...prev, type: "expense" }));
+                      setWizard((prev) => ({ ...prev, type: "expense", categoryId: undefined, category: "" }));
+                      setShowCategoryCreator(false);
+                      setCategoryCreator(createDefaultCategoryCreator("expense"));
                       setStep(2);
                     }}
                   >
@@ -312,27 +399,114 @@ export function TransactionComposer({
                 {categoriesLoading ? (
                   <p className="text-center text-sm text-caramel">Đang tải danh mục...</p>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {filteredCategories.map((category) => (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {filteredCategories.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          className="rounded-3xl border border-latte bg-white px-4 py-5 text-center shadow-sm shadow-amber-900/5 transition hover:-translate-y-0.5 hover:bg-cream"
+                          onClick={() => {
+                            setWizard((prev) => ({
+                              ...prev,
+                              categoryId: category.id,
+                              category: category.name,
+                            }));
+                            setStep(4);
+                          }}
+                        >
+                          <span className="text-3xl">{category.icon}</span>
+                          <span className="mt-2 block text-sm font-semibold text-mocha">
+                            {category.name}
+                          </span>
+                        </button>
+                      ))}
+
                       <button
-                        key={category.id}
                         type="button"
-                        className="rounded-3xl border border-latte bg-white px-4 py-5 text-center shadow-sm shadow-amber-900/5 transition hover:-translate-y-0.5 hover:bg-cream"
-                        onClick={() => {
-                          setWizard((prev) => ({
-                            ...prev,
-                            categoryId: category.id,
-                            category: category.name,
-                          }));
-                          setStep(4);
-                        }}
+                        className="rounded-3xl border border-dashed border-honey bg-amber-50 px-4 py-5 text-center shadow-sm shadow-amber-900/5 transition hover:-translate-y-0.5 hover:bg-amber-100"
+                        onClick={() => setShowCategoryCreator((current) => !current)}
                       >
-                        <span className="text-3xl">{category.icon}</span>
+                        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-honey text-2xl font-semibold text-mocha">
+                          +
+                        </span>
                         <span className="mt-2 block text-sm font-semibold text-mocha">
-                          {category.name}
+                          Thêm danh mục
                         </span>
                       </button>
-                    ))}
+                    </div>
+
+                    {showCategoryCreator ? (
+                      <div className="rounded-3xl border border-latte bg-cream p-4 shadow-sm shadow-amber-900/5">
+                        <p className="text-sm font-semibold text-mocha">Danh mục mới</p>
+                        <p className="mt-1 text-xs text-caramel">
+                          Lưu trên máy trước, có mạng sẽ tự đồng bộ.
+                        </p>
+
+                        <div className="mt-4 space-y-3">
+                          <Input
+                            placeholder="Tên danh mục"
+                            value={categoryCreator.name}
+                            onChange={(event) =>
+                              setCategoryCreator((prev) => ({
+                                ...prev,
+                                name: event.target.value,
+                              }))
+                            }
+                            className="h-12 rounded-2xl bg-white"
+                          />
+
+                          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                            {categoryIconOptions.map((icon) => {
+                              const active = categoryCreator.icon === icon;
+                              return (
+                                <button
+                                  key={icon}
+                                  type="button"
+                                  className={cn(
+                                    "flex h-12 items-center justify-center rounded-2xl border bg-white text-2xl transition",
+                                    active
+                                      ? "border-honey bg-amber-100 shadow-sm shadow-amber-900/10"
+                                      : "border-latte hover:bg-cream"
+                                  )}
+                                  onClick={() =>
+                                    setCategoryCreator((prev) => ({
+                                      ...prev,
+                                      icon,
+                                    }))
+                                  }
+                                >
+                                  {icon}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button
+                              type="button"
+                              className="h-11 flex-1 rounded-full"
+                              onClick={handleCreateCategory}
+                              disabled={savingCategory}
+                            >
+                              {savingCategory ? "Đang thêm..." : "Lưu danh mục"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 rounded-full"
+                              onClick={() => {
+                                setShowCategoryCreator(false);
+                                setCategoryCreator(createDefaultCategoryCreator(wizard.type));
+                              }}
+                              disabled={savingCategory}
+                            >
+                              Đóng
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>

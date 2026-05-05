@@ -593,10 +593,16 @@ Lay danh sach category cua user hien tai, gom category he thong va category cust
   "items": [
     {
       "id": "category_id",
+      "clientId": "category_id_or_local_id",
+      "serverId": "category_id",
       "name": "An uong",
+      "slug": "an-uong",
       "icon": "🍜",
       "categoryType": "expense",
-      "kind": "system"
+      "kind": "system",
+      "createdAt": "2026-05-05T04:00:00.000Z",
+      "updatedAt": "2026-05-05T04:00:00.000Z",
+      "syncStatus": "synced"
     }
   ]
 }
@@ -633,7 +639,16 @@ Them category custom moi.
 ```json
 {
   "id": "category_id",
-  "name": "Cafe specialty"
+  "clientId": "client_category_id_optional",
+  "serverId": "category_id",
+  "name": "Cafe specialty",
+  "slug": "cafe-specialty",
+  "icon": "☕",
+  "categoryType": "expense",
+  "kind": "custom",
+  "createdAt": "2026-05-05T04:00:00.000Z",
+  "updatedAt": "2026-05-05T04:00:00.000Z",
+  "syncStatus": "synced"
 }
 ```
 
@@ -644,6 +659,58 @@ Them category custom moi.
 | `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
 | `400` | `{ "error": "Du lieu khong hop le." }` | Sai body |
 | `409` | `{ "error": "Danh muc da ton tai." }` | Trung slug + categoryType trong cung user |
+
+## Category Sync APIs
+
+### POST `/api/sync/categories`
+
+Nhan batch tao danh muc tu local store de dong bo len server theo local-first flow.
+
+#### Auth
+
+- Bat buoc dang nhap
+
+#### Body
+
+```json
+{
+  "operations": [
+    {
+      "operationId": "op_category_1",
+      "type": "create",
+      "clientId": "local_category_1",
+      "payload": {
+        "name": "Do dung em be",
+        "icon": "🧸",
+        "categoryType": "expense"
+      }
+    }
+  ]
+}
+```
+
+#### Success
+
+```json
+{
+  "results": [
+    {
+      "operationId": "op_category_1",
+      "clientId": "local_category_1",
+      "serverId": "category_id",
+      "status": "applied"
+    }
+  ]
+}
+```
+
+#### Loi
+
+| HTTP | Body | Khi nao xay ra |
+| --- | --- | --- |
+| `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
+| `400` | `{ "error": "Du lieu sync khong hop le." }` | Thieu `operationId/clientMutationId`, `clientId`, hoac body sai schema |
+| `500` | `{ "error": "Khong the dong bo danh muc." }` | Loi DB / loi xu ly sync |
 
 ## Budgets APIs
 

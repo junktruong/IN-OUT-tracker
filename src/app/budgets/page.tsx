@@ -66,7 +66,13 @@ export default function BudgetsPage() {
   }, [fetchBudgets, period]);
 
   useEffect(() => {
-    if (!selectedCategoryId && expenseCategories.length > 0) {
+    if (expenseCategories.length === 0) {
+      setSelectedCategoryId("");
+      return;
+    }
+
+    const hasSelected = expenseCategories.some((item) => item.id === selectedCategoryId);
+    if (!selectedCategoryId || !hasSelected) {
       setSelectedCategoryId(expenseCategories[0].id);
     }
   }, [expenseCategories, selectedCategoryId]);

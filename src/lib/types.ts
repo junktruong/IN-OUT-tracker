@@ -5,6 +5,8 @@ export type TransactionSyncStatus =
   | "pending_delete"
   | "sync_error";
 
+export type CategorySyncStatus = "synced" | "pending_create" | "sync_error";
+
 export type TransactionDTO = {
   id: string;
   clientId?: string;
@@ -49,10 +51,17 @@ export type SettingsDTO = {
 
 export type CategoryDTO = {
   id: string;
+  clientId?: string;
+  serverId?: string;
   name: string;
+  slug?: string;
   icon: string;
   categoryType: "expense" | "income";
   kind: "system" | "custom";
+  createdAt?: string;
+  updatedAt?: string;
+  syncStatus?: CategorySyncStatus;
+  lastSyncError?: string;
 };
 
 export type BudgetAlertDTO = {
