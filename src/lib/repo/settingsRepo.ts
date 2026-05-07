@@ -12,7 +12,12 @@ export const getSettings = async (userId: string) => {
   if (existing) {
     return existing;
   }
-  const created = await SettingsModel.create({ userId, paydayDay: 25, salaryExpected: 0 });
+  const created = await SettingsModel.create({
+    userId,
+    paydayDay: 25,
+    salaryExpected: 0,
+    updatedAt: new Date(),
+  });
   return created.toObject();
 };
 
@@ -22,9 +27,10 @@ export const updateSettings = async (userId: string, payload: SettingsPayload) =
   if (existing) {
     existing.paydayDay = payload.paydayDay;
     existing.salaryExpected = payload.salaryExpected;
+    existing.updatedAt = new Date();
     await existing.save();
     return existing.toObject();
   }
-  const created = await SettingsModel.create({ userId, ...payload });
+  const created = await SettingsModel.create({ userId, ...payload, updatedAt: new Date() });
   return created.toObject();
 };

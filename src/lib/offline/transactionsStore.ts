@@ -463,6 +463,82 @@ export const mergeTransactionsFromServer = async (
   });
 };
 
+export const mergeTransactionsFromServerMonth = async (
+  userId: string,
+  year: number,
+  monthKey: string,
+  remoteItems: TransactionDTO[]
+) => {
+  return runWithStoreQueue(async () => {
+    const items = await getAllTransactions();
+    const jobs = await getAllSyncJobs();
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const remoteIds = new Set<string>();
+
+    remoteItems.forEach((item) => {
+      const clientId = item.clientId ?? item.id;
+      const existing = byId.get(clientId);
+      remoteIds.add(clientId);
+
+      const nextItem: StoredTransaction = {
+        id: clientId,
+        userId,
+        clientId,
+        serverId: item.serverId ?? item.id,
+        date: item.date,
+        type: item.type,
+        amount: item.amount,
+        categoryId: item.categoryId,
+        category: item.category,
+        desc: item.desc,
+        source: item.source,
+        method: item.method,
+        account: item.account,
+        note: item.note,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt ?? item.createdAt,
+        syncStatus: "synced",
+        lastSyncError: undefined,
+      };
+
+      if (existing?.syncStatus === "pending_create" || existing?.syncStatus === "pending_update") {
+        byId.set(clientId, {
+          ...existing,
+          serverId: item.serverId ?? existing.serverId ?? item.id,
+        });
+        return;
+      }
+
+      if (existing?.syncStatus === "pending_delete") {
+        byId.set(clientId, {
+          ...existing,
+          serverId: item.serverId ?? existing.serverId ?? item.id,
+        });
+        return;
+      }
+
+      byId.set(clientId, nextItem);
+    });
+
+    for (const item of byId.values()) {
+      if (
+        item.userId === userId &&
+        item.date.startsWith(monthKey) &&
+        item.syncStatus === "synced" &&
+        !remoteIds.has(item.id)
+      ) {
+        byId.delete(item.id);
+      }
+    }
+
+    const nextItems = [...byId.values()];
+    await writeTransactionsAndJobs(nextItems, jobs);
+    return toVisibleTransactions(
+      nextItems.filter((item) => item.userId === userId && item.date.startsWith(String(year)))
+    );
+  });
+};
+
 export const applySuccessfulTransactionSync = async (
   userId: string,
   results: SyncResult[]

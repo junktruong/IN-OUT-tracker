@@ -1,9 +1,12 @@
+import mongoose from "mongoose";
+
 import { connectToDatabase } from "@/lib/db/connect";
 import { BillModel } from "@/lib/db/models";
 import type { BillCycleType } from "@/lib/domain/bills";
 
 export type BillPayload = {
   id?: string;
+  clientId?: string;
   name: string;
   amount: number;
   cycleType: BillCycleType;
@@ -12,6 +15,14 @@ export type BillPayload = {
   start?: Date | null;
   end?: Date | null;
   note?: string;
+};
+
+const getBillIdentifierQuery = (id: string) => {
+  if (mongoose.isValidObjectId(id)) {
+    return { $or: [{ _id: id }, { clientId: id }] };
+  }
+
+  return { clientId: id };
 };
 
 const optionalBillFields = (payload: BillPayload) => {
@@ -44,13 +55,15 @@ export const upsertBill = async (userId: string, payload: BillPayload) => {
   if (payload.id) {
     const optional = optionalBillFields(payload);
     return BillModel.findOneAndUpdate(
-      { _id: payload.id, userId },
+      { userId, ...getBillIdentifierQuery(payload.id) },
       {
         $set: {
           name: payload.name,
           amount: payload.amount,
           cycleType: payload.cycleType,
           cycleValue: payload.cycleValue,
+          ...(payload.clientId ? { clientId: payload.clientId } : {}),
+          updatedAt: new Date(),
           ...optional.$set,
         },
         $unset: { dueDay: "", ...optional.$unset },
@@ -61,6 +74,7 @@ export const upsertBill = async (userId: string, payload: BillPayload) => {
 
   const bill = await BillModel.create({
     userId,
+    clientId: payload.clientId,
     name: payload.name,
     amount: payload.amount,
     cycleType: payload.cycleType,
@@ -69,9 +83,15 @@ export const upsertBill = async (userId: string, payload: BillPayload) => {
     start: payload.start ?? undefined,
     end: payload.end ?? undefined,
     note: payload.note,
+    updatedAt: new Date(),
   });
 
   return bill.toObject();
+};
+
+export const getBillByClientId = async (userId: string, clientId: string) => {
+  await connectToDatabase();
+  return BillModel.findOne({ userId, clientId }).lean();
 };
 
 export const toggleBillPaid = async (
@@ -82,10 +102,13 @@ export const toggleBillPaid = async (
 ) => {
   await connectToDatabase();
   return BillModel.findOneAndUpdate(
-    { _id: id, userId },
+    { userId, ...getBillIdentifierQuery(id) },
     paidAt
-      ? { $set: { paid, paidAt } }
-      : { $set: { paid }, $unset: { paidAt: "", paidAmount: "", paidNote: "" } },
+      ? { $set: { paid, paidAt, updatedAt: new Date() } }
+      : {
+          $set: { paid, updatedAt: new Date() },
+          $unset: { paidAt: "", paidAmount: "", paidNote: "" },
+        },
     { new: true }
   ).lean();
 };
@@ -101,6 +124,7 @@ export const payBill = async (
   const $set: Record<string, boolean | Date | number | string> = {
     paid: true,
     paidAt,
+    updatedAt: new Date(),
   };
   const $unset: Record<string, ""> = {};
 
@@ -117,7 +141,7 @@ export const payBill = async (
   }
 
   return BillModel.findOneAndUpdate(
-    { _id: id, userId },
+    { userId, ...getBillIdentifierQuery(id) },
     {
       $set,
       $unset,
@@ -129,13 +153,16 @@ export const payBill = async (
 export const unpayBill = async (userId: string, id: string) => {
   await connectToDatabase();
   return BillModel.findOneAndUpdate(
-    { _id: id, userId },
-    { $set: { paid: false }, $unset: { paidAt: "", paidAmount: "", paidNote: "" } },
+    { userId, ...getBillIdentifierQuery(id) },
+    {
+      $set: { paid: false, updatedAt: new Date() },
+      $unset: { paidAt: "", paidAmount: "", paidNote: "" },
+    },
     { new: true }
   ).lean();
 };
 
 export const deleteBillById = async (userId: string, id: string) => {
   await connectToDatabase();
-  return BillModel.findOneAndDelete({ _id: id, userId }).lean();
+  return BillModel.findOneAndDelete({ userId, ...getBillIdentifierQuery(id) }).lean();
 };

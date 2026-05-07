@@ -14,6 +14,14 @@ import { TransactionComposer } from "@/components/dashboard/TransactionComposer"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransactionsLocalFirst } from "@/hooks/useTransactionsLocalFirst";
 import { addMonths, monthKey, toYmd } from "@/lib/domain/date";
+import {
+  readBillsSnapshot,
+  readBudgetAlertsSnapshot,
+  readSettingsSnapshot,
+  writeBillsSnapshot,
+  writeBudgetAlertsSnapshot,
+  writeSettingsSnapshot,
+} from "@/lib/offline/userSnapshots";
 import { payrollWindow } from "@/lib/domain/payroll";
 import { reserveInWindow } from "@/lib/domain/reserve";
 import type { TransactionInput } from "@/lib/domain/transactions";
@@ -42,7 +50,7 @@ export default function HomePage() {
     createTransactionsFromQuickInput,
     updateTransaction,
     deleteTransaction,
-  } = useTransactionsLocalFirst(user?.id, year);
+  } = useTransactionsLocalFirst(user?.id, year, month);
 
   const fetchBills = useCallback(async () => {
     const response = await fetch("/api/bills");
@@ -72,18 +80,45 @@ export default function HomePage() {
   }, []);
 
   const refreshBudgetAlerts = useCallback(async () => {
+    if (!user?.id) {
+      setBudgetAlerts([]);
+      return;
+    }
+
     try {
       const alerts = await fetchBudgetAlerts();
       setBudgetAlerts(alerts);
+      await writeBudgetAlertsSnapshot(user.id, alerts);
     } catch {
-      setBudgetAlerts([]);
+      setBudgetAlerts(await readBudgetAlertsSnapshot(user.id));
     }
-  }, [fetchBudgetAlerts]);
+  }, [fetchBudgetAlerts, user]);
 
   useEffect(() => {
     let ignore = false;
 
     const loadInitialData = async () => {
+      if (!user?.id) {
+        if (!ignore) {
+          setSettings({ paydayDay: 25, salaryExpected: 0 });
+          setBills([]);
+          setBudgetAlerts([]);
+        }
+        return;
+      }
+
+      const [cachedSettings, cachedBills, cachedAlerts] = await Promise.all([
+        readSettingsSnapshot(user.id),
+        readBillsSnapshot(user.id),
+        readBudgetAlertsSnapshot(user.id),
+      ]);
+
+      if (!ignore) {
+        setSettings(cachedSettings);
+        setBills(cachedBills);
+        setBudgetAlerts(cachedAlerts);
+      }
+
       const [settingsResult, billsResult, alertsResult] = await Promise.allSettled([
         fetchSettings(),
         fetchBills(),
@@ -96,12 +131,15 @@ export default function HomePage() {
 
       if (settingsResult.status === "fulfilled") {
         setSettings(settingsResult.value);
+        void writeSettingsSnapshot(user.id, settingsResult.value);
       }
       if (billsResult.status === "fulfilled") {
         setBills(billsResult.value);
+        void writeBillsSnapshot(user.id, billsResult.value);
       }
       if (alertsResult.status === "fulfilled") {
         setBudgetAlerts(alertsResult.value);
+        void writeBudgetAlertsSnapshot(user.id, alertsResult.value);
       }
     };
 
@@ -110,7 +148,7 @@ export default function HomePage() {
     return () => {
       ignore = true;
     };
-  }, [fetchBills, fetchBudgetAlerts, fetchSettings]);
+  }, [fetchBills, fetchBudgetAlerts, fetchSettings, user?.id]);
 
   const monthTransactions = useMemo(
     () => transactions.filter((item) => item.date.startsWith(month)),

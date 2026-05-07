@@ -576,6 +576,89 @@ Bo danh dau da dong.
 | `401` | `{ "error": "Vui long dang nhap bang Google." }` |
 | `404` | `{ "error": "Khong tim thay khoan dong." }` |
 
+---
+
+### POST `/api/sync/bills`
+
+Dong bo batch khoan dong tu local queue len server. Route nay duoc dung cho local-first flow cua bills, co idempotency bang `operationId` hoac `clientMutationId`.
+
+#### Auth
+
+- Bat buoc dang nhap
+
+#### Body
+
+```json
+{
+  "operations": [
+    {
+      "operationId": "op_bill_1",
+      "type": "upsert",
+      "clientId": "local_bill_1",
+      "payload": {
+        "name": "Tien dien",
+        "amount": 450000,
+        "cycleType": "monthly",
+        "cycleValue": 12
+      }
+    },
+    {
+      "operationId": "op_bill_2",
+      "type": "pay",
+      "clientId": "local_bill_1",
+      "serverId": "bill_id_optional",
+      "payload": {
+        "paidAt": "2026-05-07",
+        "paidAmount": 450000
+      }
+    },
+    {
+      "operationId": "op_bill_3",
+      "type": "delete",
+      "clientId": "local_bill_1",
+      "serverId": "bill_id_optional"
+    }
+  ]
+}
+```
+
+#### Rule
+
+- `type` ho tro: `upsert`, `delete`, `pay`, `unpay`
+- `upsert` bat buoc co `payload` theo schema bill
+- `pay` bat buoc co `payload` theo schema payment
+- `operationId` hoac `clientMutationId` bat buoc co it nhat 1 field
+- `clientId` la dinh danh on dinh do client sinh ra de noi local bill voi server bill
+
+#### Success
+
+```json
+{
+  "results": [
+    {
+      "operationId": "op_bill_1",
+      "clientId": "local_bill_1",
+      "serverId": "bill_id",
+      "status": "applied"
+    }
+  ]
+}
+```
+
+#### `status` meaning
+
+- `applied`: Server vua xu ly thay doi
+- `duplicate`: `operationId` da duoc xu ly truoc do hoac record da o trang thai tuong ung
+- `deleted`: Bill da bi xoa tren server
+
+#### Loi
+
+| HTTP | Body | Khi nao xay ra |
+| --- | --- | --- |
+| `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
+| `400` | `{ "error": "Du lieu sync khong hop le." }` | Thieu `operationId/clientMutationId`, `clientId`, hoac `payload` sai schema |
+| `500` | `{ "error": "Khong the dong bo khoan dong." }` | Loi DB / loi xu ly sync |
+
 ## Categories APIs
 
 ### GET `/api/categories`
@@ -792,6 +875,66 @@ Tao moi hoac cap nhat ngan sach theo `categoryId + period`.
 
 ---
 
+### POST `/api/sync/budgets`
+
+Dong bo batch ngan sach tu local queue len server. Route nay duoc dung cho local-first flow cua budgets.
+
+#### Auth
+
+- Bat buoc dang nhap
+
+#### Body
+
+```json
+{
+  "operations": [
+    {
+      "operationId": "op_budget_1",
+      "type": "upsert",
+      "payload": {
+        "categoryId": "category_id",
+        "amountLimit": 200000,
+        "period": "weekly"
+      }
+    }
+  ]
+}
+```
+
+#### Rule
+
+- `operationId` hoac `clientMutationId` bat buoc co it nhat 1 field
+- `categoryId` phai la server category id hop le vao luc job duoc gui len server
+- Client co the tam giu queue neu category custom chua sync xong
+
+#### Success
+
+```json
+{
+  "results": [
+    {
+      "operationId": "op_budget_1",
+      "status": "applied"
+    }
+  ]
+}
+```
+
+#### `status` meaning
+
+- `applied`: Server vua xu ly thay doi
+- `duplicate`: `operationId` da duoc xu ly truoc do
+
+#### Loi
+
+| HTTP | Body | Khi nao xay ra |
+| --- | --- | --- |
+| `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
+| `400` | `{ "error": "Du lieu sync khong hop le." }` | Body sai schema sync |
+| `500` | `{ "error": "Khong the dong bo ngan sach." }` | Loi DB / loi xu ly sync |
+
+---
+
 ### GET `/api/budgets/alerts`
 
 Tra ve cac canh bao ngan sach co muc su dung tu `80%` tro len trong tuan / thang / nam hien tai.
@@ -878,6 +1021,64 @@ Cap nhat settings.
 | --- | --- |
 | `401` | `{ "error": "Vui long dang nhap bang Google." }` |
 | `400` | `{ "error": "Du lieu khong hop le." }` |
+
+---
+
+### POST `/api/sync/settings`
+
+Dong bo batch settings tu local queue len server. Route nay duoc dung cho local-first flow cua settings.
+
+#### Auth
+
+- Bat buoc dang nhap
+
+#### Body
+
+```json
+{
+  "operations": [
+    {
+      "operationId": "op_settings_1",
+      "type": "upsert",
+      "payload": {
+        "paydayDay": 25,
+        "salaryExpected": 20000000
+      }
+    }
+  ]
+}
+```
+
+#### Rule
+
+- `operationId` hoac `clientMutationId` bat buoc co it nhat 1 field
+- Queue cua settings mac dinh chi giu ban cap nhat moi nhat
+
+#### Success
+
+```json
+{
+  "results": [
+    {
+      "operationId": "op_settings_1",
+      "status": "applied"
+    }
+  ]
+}
+```
+
+#### `status` meaning
+
+- `applied`: Server vua xu ly thay doi
+- `duplicate`: `operationId` da duoc xu ly truoc do
+
+#### Loi
+
+| HTTP | Body | Khi nao xay ra |
+| --- | --- | --- |
+| `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
+| `400` | `{ "error": "Du lieu sync khong hop le." }` | Body sai schema sync |
+| `500` | `{ "error": "Khong the dong bo cai dat." }` | Loi DB / loi xu ly sync |
 
 ## Ghi chu cho lan cap nhat API tiep theo
 

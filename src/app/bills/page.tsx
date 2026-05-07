@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useBillsLocalFirst } from "@/hooks/useBillsLocalFirst";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,8 +13,7 @@ import { toYmd } from "@/lib/domain/date";
 import type { BillCycleType } from "@/lib/domain/bills";
 import type { BillDTO } from "@/lib/types";
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("vi-VN").format(value);
+const formatCurrency = (value: number) => new Intl.NumberFormat("vi-VN").format(value);
 
 const cycleOptions: Array<{ value: BillCycleType; label: string }> = [
   { value: "monthly", label: "Hàng tháng" },
@@ -47,42 +47,33 @@ const cycleLabel = (bill: Pick<BillDTO, "cycleType" | "cycleValue">) => {
 };
 
 export default function BillsPage() {
-  const [bills, setBills] = useState<BillDTO[]>([]);
+  const {
+    items: bills,
+    loading,
+    syncState,
+    saveBill,
+    removeBill,
+    confirmBillPaid,
+    undoBillPaid,
+  } = useBillsLocalFirst();
   const [filter, setFilter] = useState<"all" | "unpaid">("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [payingBill, setPayingBill] = useState<BillDTO | null>(null);
   const [confirmingPay, setConfirmingPay] = useState(false);
 
-  const fetchBills = useCallback(async () => {
-    const response = await fetch("/api/bills");
-    if (!response.ok) {
-      throw new Error("Không thể tải khoản đóng.");
+  const syncMessage = useMemo(() => {
+    if (syncState.syncing) {
+      return "Đang đồng bộ các khoản đóng với server...";
     }
-    const data = await response.json();
-    return (data.items ?? []) as BillDTO[];
-  }, []);
-
-  const loadBills = useCallback(async () => {
-    setBills(await fetchBills());
-  }, [fetchBills]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadInitialBills = async () => {
-      const items = await fetchBills();
-      if (!ignore) {
-        setBills(items);
-      }
-    };
-
-    void loadInitialBills();
-
-    return () => {
-      ignore = true;
-    };
-  }, [fetchBills]);
+    if (syncState.lastError) {
+      return `Đang chờ đồng bộ lại: ${syncState.lastError}`;
+    }
+    if (syncState.pendingCount > 0) {
+      return `Còn ${syncState.pendingCount} thay đổi đang chờ đồng bộ.`;
+    }
+    return "Khoản đóng đã được lưu trên máy và đồng bộ xong.";
+  }, [syncState]);
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
@@ -116,31 +107,31 @@ export default function BillsPage() {
       }
     }
 
-    const response = await fetch("/api/bills", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: editingId ?? undefined,
-        name: form.name,
-        amount,
-        cycleType: form.cycleType,
-        cycleValue,
-        group: form.group || undefined,
-        start: form.start || undefined,
-        end: form.end || undefined,
-        note: form.note || undefined,
-      }),
-    });
-
-    if (!response.ok) {
+    try {
+      await saveBill(
+        {
+          id: editingId ?? undefined,
+          name: form.name,
+          amount,
+          cycleType: form.cycleType,
+          cycleValue,
+          group: form.group || undefined,
+          start: form.start || undefined,
+          end: form.end || undefined,
+          note: form.note || undefined,
+        },
+        editingId ?? undefined
+      );
+      toast.success(
+        typeof navigator !== "undefined" && navigator.onLine
+          ? "Đã lưu khoản đóng. App sẽ đồng bộ ngay."
+          : "Đã lưu khoản đóng trên máy. Có mạng lại app sẽ tự đồng bộ."
+      );
+      setForm(emptyForm);
+      setEditingId(null);
+    } catch {
       toast.error("Không thể lưu khoản đóng.");
-      return;
     }
-
-    toast.success("Đã lưu khoản đóng.");
-    setForm(emptyForm);
-    setEditingId(null);
-    void loadBills();
   };
 
   const handleEdit = (bill: BillDTO) => {
@@ -162,42 +153,36 @@ export default function BillsPage() {
     if (!confirmed) {
       return;
     }
-    const response = await fetch(`/api/bills/${bill.id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) {
-      toast.error("Không thể xoá khoản đóng.");
-      return;
-    }
-    toast.success("Đã xoá khoản đóng.");
-    void loadBills();
-  };
 
-  const openPayDialog = (bill: BillDTO) => {
-    setPayingBill(bill);
+    try {
+      await removeBill(bill);
+      toast.success(
+        typeof navigator !== "undefined" && navigator.onLine
+          ? "Đã xoá khoản đóng. App sẽ đồng bộ ngay."
+          : "Đã xoá khoản đóng trên máy. Có mạng lại app sẽ tự đồng bộ."
+      );
+    } catch {
+      toast.error("Không thể xoá khoản đóng.");
+    }
   };
 
   const handleConfirmPay = async () => {
     if (!payingBill) {
       return;
     }
+
     setConfirmingPay(true);
-    const payload = {
-      paidAt: toYmd(new Date()),
-      paidAmount: payingBill.amount,
-    };
     try {
-      const response = await fetch(`/api/bills/${payingBill.id}/pay`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      await confirmBillPaid(payingBill, {
+        paidAt: toYmd(new Date()),
+        paidAmount: payingBill.amount,
       });
-      if (!response.ok) {
-        throw new Error("failed");
-      }
-      toast.success("Đã xác nhận đóng.");
+      toast.success(
+        typeof navigator !== "undefined" && navigator.onLine
+          ? "Đã xác nhận đóng. App sẽ đồng bộ ngay."
+          : "Đã xác nhận trên máy. Có mạng lại app sẽ tự đồng bộ."
+      );
       setPayingBill(null);
-      void loadBills();
     } catch {
       toast.error("Không thể xác nhận đã đóng.");
     } finally {
@@ -206,15 +191,16 @@ export default function BillsPage() {
   };
 
   const handleUnpay = async (bill: BillDTO) => {
-    const response = await fetch(`/api/bills/${bill.id}/unpay`, {
-      method: "PATCH",
-    });
-    if (!response.ok) {
+    try {
+      await undoBillPaid(bill);
+      toast.success(
+        typeof navigator !== "undefined" && navigator.onLine
+          ? "Đã hoàn tác. App sẽ đồng bộ ngay."
+          : "Đã hoàn tác trên máy. Có mạng lại app sẽ tự đồng bộ."
+      );
+    } catch {
       toast.error("Không thể hoàn tác.");
-      return;
     }
-    toast.success("Đã hoàn tác.");
-    void loadBills();
   };
 
   const visibleBills = bills.filter((bill) => (filter === "unpaid" ? !bill.paid : true));
@@ -313,7 +299,10 @@ export default function BillsPage() {
               Ngày bắt đầu sẽ được dùng làm mốc chu kỳ tuỳ chỉnh.
             </p>
           ) : null}
-          <Button className="w-full sm:w-auto" onClick={handleSubmit}>Lưu khoản đóng</Button>
+          <p className="text-xs text-caramel">{syncMessage}</p>
+          <Button className="w-full sm:w-auto" onClick={handleSubmit}>
+            Lưu khoản đóng
+          </Button>
         </CardContent>
       </Card>
 
@@ -328,7 +317,13 @@ export default function BillsPage() {
         </TabsList>
         <TabsContent value={filter}>
           <div className="space-y-3">
-            {visibleBills.length === 0 ? (
+            {loading ? (
+              <Card>
+                <CardContent className="p-4 text-sm text-muted-foreground">
+                  Đang tải khoản đóng...
+                </CardContent>
+              </Card>
+            ) : visibleBills.length === 0 ? (
               <Card>
                 <CardContent className="p-4 text-sm text-muted-foreground">
                   Không có khoản đóng phù hợp.
@@ -343,20 +338,47 @@ export default function BillsPage() {
                       <p className="text-xs text-muted-foreground">
                         {cycleLabel(bill)} • {formatCurrency(bill.amount)}
                       </p>
+                      {bill.syncStatus && bill.syncStatus !== "synced" ? (
+                        <p className="mt-1 text-xs text-caramel">
+                          {bill.syncStatus === "sync_error"
+                            ? bill.lastSyncError ?? "Đang chờ đồng bộ lại."
+                            : "Đang chờ đồng bộ lên server."}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                      <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => handleEdit(bill)}>
+                      <Button
+                        className="w-full sm:w-auto"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(bill)}
+                      >
                         Sửa
                       </Button>
-                      <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => handleDelete(bill)}>
+                      <Button
+                        className="w-full sm:w-auto"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(bill)}
+                      >
                         Xoá
                       </Button>
                       {bill.paid ? (
-                        <Button className="col-span-2 w-full sm:w-auto" size="sm" variant="outline" onClick={() => handleUnpay(bill)}>
+                        <Button
+                          className="col-span-2 w-full sm:w-auto"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUnpay(bill)}
+                        >
                           Hoàn tác
                         </Button>
                       ) : (
-                        <Button className="col-span-2 w-full sm:w-auto" size="sm" variant="outline" onClick={() => openPayDialog(bill)}>
+                        <Button
+                          className="col-span-2 w-full sm:w-auto"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setPayingBill(bill)}
+                        >
                           Xác nhận đã đóng
                         </Button>
                       )}

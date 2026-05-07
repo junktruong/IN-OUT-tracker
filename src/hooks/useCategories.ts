@@ -14,6 +14,7 @@ import {
   mergeCategoriesFromServer,
   queueLocalCategoryCreate,
 } from "@/lib/offline/categoriesStore";
+import { writeCategoriesSnapshot } from "@/lib/offline/userSnapshots";
 
 type SyncState = {
   syncing: boolean;
@@ -204,6 +205,14 @@ export function useCategories(active = true) {
     await syncPending();
     await refreshFromServer();
   }, [loadLocalCategories, refreshFromServer, syncPending]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    void writeCategoriesSnapshot(userId, categories);
+  }, [categories, userId]);
 
   return { categories, loading, syncState, reload, createCategory };
 }

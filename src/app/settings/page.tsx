@@ -1,64 +1,61 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { InstallPwaButton } from "@/components/app/InstallPwaButton";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useSettingsLocalFirst } from "@/hooks/useSettingsLocalFirst";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { SettingsDTO } from "@/lib/types";
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
   const { user, signOut } = useAuth();
-
-  const fetchSettings = useCallback(async () => {
-    const response = await fetch("/api/settings");
-    if (!response.ok) {
-      throw new Error("Không thể tải cài đặt.");
-    }
-    const data = await response.json();
-    return data as SettingsDTO;
-  }, []);
+  const { settings, loading, syncState, saveSettings } = useSettingsLocalFirst();
+  const [draft, setDraft] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
 
   useEffect(() => {
-    let ignore = false;
+    setDraft(settings);
+  }, [settings]);
 
-    const loadInitialSettings = async () => {
-      const data = await fetchSettings();
-      if (!ignore) {
-        setSettings(data);
-      }
-    };
-
-    void loadInitialSettings();
-
-    return () => {
-      ignore = true;
-    };
-  }, [fetchSettings]);
+  const syncMessage = useMemo(() => {
+    if (syncState.syncing) {
+      return "Đang đồng bộ cài đặt với server...";
+    }
+    if (syncState.lastError) {
+      return `Đang chờ đồng bộ lại: ${syncState.lastError}`;
+    }
+    if (syncState.pendingCount > 0) {
+      return `Còn ${syncState.pendingCount} thay đổi đang chờ đồng bộ.`;
+    }
+    return "Cài đặt đã được lưu trên máy và đồng bộ xong.";
+  }, [syncState]);
 
   const handleSave = async () => {
-    if (settings.paydayDay < 1 || settings.paydayDay > 31) {
+    if (draft.paydayDay < 1 || draft.paydayDay > 31) {
       toast.error("Ngày lương phải từ 1-31.");
       return;
     }
-    if (!Number.isFinite(settings.salaryExpected) || settings.salaryExpected < 0) {
+    if (!Number.isFinite(draft.salaryExpected) || draft.salaryExpected < 0) {
       toast.error("Lương dự kiến phải lớn hơn hoặc bằng 0.");
       return;
     }
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-    if (!response.ok) {
+
+    try {
+      await saveSettings({
+        paydayDay: draft.paydayDay,
+        salaryExpected: draft.salaryExpected,
+      });
+      toast.success(
+        typeof navigator !== "undefined" && navigator.onLine
+          ? "Đã lưu cài đặt. App sẽ đồng bộ ngay."
+          : "Đã lưu cài đặt trên máy. Có mạng lại app sẽ tự đồng bộ."
+      );
+    } catch {
       toast.error("Không thể lưu cài đặt.");
-      return;
     }
-    toast.success("Đã lưu cài đặt.");
   };
 
   return (
@@ -111,9 +108,9 @@ export default function SettingsPage() {
               min={1}
               max={31}
               inputMode="numeric"
-              value={settings.paydayDay}
+              value={draft.paydayDay}
               onChange={(event) =>
-                setSettings((prev) => ({
+                setDraft((prev) => ({
                   ...prev,
                   paydayDay: Number(event.target.value),
                 }))
@@ -125,9 +122,9 @@ export default function SettingsPage() {
               type="number"
               min={0}
               inputMode="numeric"
-              value={settings.salaryExpected}
+              value={draft.salaryExpected}
               onChange={(event) =>
-                setSettings((prev) => ({
+                setDraft((prev) => ({
                   ...prev,
                   salaryExpected: Number(event.target.value),
                 }))
@@ -136,7 +133,12 @@ export default function SettingsPage() {
               className="h-11 rounded-2xl"
             />
           </div>
-          <Button className="w-full rounded-full sm:w-auto" onClick={handleSave}>
+          <p className="text-xs text-caramel">{syncMessage}</p>
+          <Button
+            className="w-full rounded-full sm:w-auto"
+            onClick={handleSave}
+            disabled={loading}
+          >
             Lưu cài đặt
           </Button>
         </CardContent>

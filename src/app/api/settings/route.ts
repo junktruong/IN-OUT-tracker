@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
+import { settingsSchema } from "@/lib/domain/settings";
 import { getSettings, updateSettings } from "@/lib/repo/settingsRepo";
 import { getSessionUserFromRequest, unauthorizedResponse } from "@/lib/auth/session";
-
-const bodySchema = z.object({
-  paydayDay: z.number().int().min(1).max(31),
-  salaryExpected: z.number().min(0),
-});
 
 export async function GET(request: Request) {
   const user = getSessionUserFromRequest(request);
@@ -19,6 +14,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     paydayDay: settings.paydayDay,
     salaryExpected: settings.salaryExpected,
+    updatedAt: settings.updatedAt?.toISOString?.(),
+    syncStatus: "synced" as const,
   });
 }
 
@@ -29,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const parse = bodySchema.safeParse(body);
+  const parse = settingsSchema.safeParse(body);
 
   if (!parse.success) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
@@ -39,5 +36,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     paydayDay: settings.paydayDay,
     salaryExpected: settings.salaryExpected,
+    updatedAt: settings.updatedAt?.toISOString?.(),
+    syncStatus: "synced" as const,
   });
 }

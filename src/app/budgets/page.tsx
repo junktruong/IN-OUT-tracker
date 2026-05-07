@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useCategories } from "@/hooks/useCategories";
+import { useBudgetsLocalFirst } from "@/hooks/useBudgetsLocalFirst";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { BudgetDTO } from "@/lib/types";
 import type { BudgetPeriod } from "@/lib/domain/budgets";
 
 const periodOptions: Array<{ value: BudgetPeriod; label: string }> = [
@@ -32,38 +32,16 @@ const ratioColor = (ratio: number) => {
 
 export default function BudgetsPage() {
   const [period, setPeriod] = useState<BudgetPeriod>("weekly");
-  const [items, setItems] = useState<BudgetDTO[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [amountLimit, setAmountLimit] = useState("");
   const { categories, loading: categoriesLoading } = useCategories(true);
+  const { items, loading, syncState, saveBudget } = useBudgetsLocalFirst(period, categories);
 
   const expenseCategories = useMemo(
     () => categories.filter((item) => item.categoryType === "expense"),
     [categories]
   );
-
-  const fetchBudgets = useCallback(async (targetPeriod: BudgetPeriod) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/budgets?period=${targetPeriod}`, {
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error("failed");
-      }
-
-      const data = (await response.json()) as { items?: BudgetDTO[] };
-      setItems(data.items ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchBudgets(period);
-  }, [fetchBudgets, period]);
 
   useEffect(() => {
     if (expenseCategories.length === 0) {
@@ -93,6 +71,19 @@ export default function BudgetsPage() {
   const activePeriodLabel =
     periodOptions.find((item) => item.value === period)?.label.toLowerCase() ?? "tuần";
 
+  const syncMessage = useMemo(() => {
+    if (syncState.syncing) {
+      return "Đang đồng bộ ngân sách với server...";
+    }
+    if (syncState.lastError) {
+      return `Đang chờ đồng bộ lại: ${syncState.lastError}`;
+    }
+    if (syncState.pendingCount > 0) {
+      return `Còn ${syncState.pendingCount} thay đổi ngân sách đang chờ đồng bộ.`;
+    }
+    return "Ngân sách đã được lưu trên máy và đồng bộ xong.";
+  }, [syncState]);
+
   const handleSave = async () => {
     const parsedLimit = Number(amountLimit);
 
@@ -107,23 +98,18 @@ export default function BudgetsPage() {
 
     setSaving(true);
     try {
-      const response = await fetch("/api/budgets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categoryId: selectedCategoryId,
-          amountLimit: parsedLimit,
-          period,
-        }),
+      await saveBudget({
+        categoryId: selectedCategoryId,
+        amountLimit: parsedLimit,
+        period,
       });
 
-      if (!response.ok) {
-        throw new Error("failed");
-      }
-
       setAmountLimit("");
-      toast.success("Đã lưu ngân sách.");
-      await fetchBudgets(period);
+      toast.success(
+        typeof navigator !== "undefined" && navigator.onLine
+          ? "Đã lưu ngân sách. App sẽ đồng bộ ngay."
+          : "Đã lưu ngân sách trên máy. Có mạng lại app sẽ tự đồng bộ."
+      );
     } catch {
       toast.error("Không thể lưu ngân sách.");
     } finally {
@@ -181,6 +167,7 @@ export default function BudgetsPage() {
                   onChange={(event) => setAmountLimit(event.target.value)}
                   className="h-12 rounded-2xl"
                 />
+                <p className="text-xs text-caramel">{syncMessage}</p>
                 <Button
                   className="h-12 w-full rounded-full"
                   onClick={handleSave}
@@ -243,6 +230,13 @@ export default function BudgetsPage() {
                     <p className="text-sm text-caramel">
                       {item.periodLabel} • Đã dùng {formatCurrency(item.spent)} / {formatCurrency(item.amountLimit)}
                     </p>
+                    {item.syncStatus && item.syncStatus !== "synced" ? (
+                      <p className="mt-1 text-xs text-caramel">
+                        {item.syncStatus === "sync_error"
+                          ? item.lastSyncError ?? "Đang chờ đồng bộ lại."
+                          : "Đang chờ đồng bộ lên server."}
+                      </p>
+                    ) : null}
                   </div>
                   <p
                     className={`text-sm font-semibold ${

@@ -36,6 +36,7 @@ transactionSchema.index(
 const billSchema = new Schema(
   {
     userId: { type: String, required: true, index: true },
+    clientId: { type: String, index: true },
     name: { type: String, required: true },
     amount: { type: Number, required: true },
     cycleType: {
@@ -55,17 +56,23 @@ const billSchema = new Schema(
     paidAmount: { type: Number },
     paidNote: { type: String },
     createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );
 
 billSchema.index({ userId: 1, cycleType: 1, cycleValue: 1 });
+billSchema.index(
+  { userId: 1, clientId: 1 },
+  { unique: true, partialFilterExpression: { clientId: { $exists: true } } }
+);
 
 const settingsSchema = new Schema(
   {
     userId: { type: String, required: true, unique: true, index: true },
     paydayDay: { type: Number, default: 25 },
     salaryExpected: { type: Number, default: 0 },
+    updatedAt: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );

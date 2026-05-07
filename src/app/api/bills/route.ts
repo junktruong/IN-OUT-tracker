@@ -20,7 +20,9 @@ export async function GET(request: Request) {
     const cycleValue = item.cycleValue ?? legacy.dueDay ?? 1;
 
     return {
-      id: String(item._id),
+      id: item.clientId ?? String(item._id),
+      clientId: item.clientId ?? String(item._id),
+      serverId: String(item._id),
       name: item.name,
       amount: item.amount,
       cycleType,
@@ -34,6 +36,8 @@ export async function GET(request: Request) {
       paidAmount: item.paidAmount ?? undefined,
       paidNote: item.paidNote ?? undefined,
       createdAt: item.createdAt ? item.createdAt.toISOString() : undefined,
+      updatedAt: item.updatedAt ? item.updatedAt.toISOString() : undefined,
+      syncStatus: "synced" as const,
     };
   });
   return NextResponse.json({ items: response });
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
   const payload = parse.data;
   const result = await upsertBill(user.id, {
     id: payload.id,
+    clientId: payload.id,
     name: payload.name,
     amount: payload.amount,
     cycleType: payload.cycleType,
@@ -65,5 +70,9 @@ export async function POST(request: Request) {
     note: payload.note,
   });
 
-  return NextResponse.json({ id: String(result?._id) });
+  return NextResponse.json({
+    id: result?.clientId ?? String(result?._id),
+    clientId: result?.clientId ?? String(result?._id),
+    serverId: result?._id ? String(result._id) : undefined,
+  });
 }

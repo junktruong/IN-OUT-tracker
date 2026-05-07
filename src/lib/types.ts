@@ -6,6 +6,15 @@ export type TransactionSyncStatus =
   | "sync_error";
 
 export type CategorySyncStatus = "synced" | "pending_create" | "sync_error";
+export type BillSyncStatus =
+  | "synced"
+  | "pending_upsert"
+  | "pending_delete"
+  | "pending_pay"
+  | "pending_unpay"
+  | "sync_error";
+export type BudgetSyncStatus = "synced" | "pending_upsert" | "sync_error";
+export type SettingsSyncStatus = "synced" | "pending_upsert" | "sync_error";
 
 export type TransactionDTO = {
   id: string;
@@ -29,6 +38,8 @@ export type TransactionDTO = {
 
 export type BillDTO = {
   id: string;
+  clientId?: string;
+  serverId?: string;
   name: string;
   amount: number;
   cycleType: "monthly" | "weekly" | "custom_days";
@@ -42,11 +53,17 @@ export type BillDTO = {
   paidAmount?: number;
   paidNote?: string;
   createdAt?: string;
+  updatedAt?: string;
+  syncStatus?: BillSyncStatus;
+  lastSyncError?: string;
 };
 
 export type SettingsDTO = {
   paydayDay: number;
   salaryExpected: number;
+  updatedAt?: string;
+  syncStatus?: SettingsSyncStatus;
+  lastSyncError?: string;
 };
 
 export type CategoryDTO = {
@@ -88,4 +105,7 @@ export type BudgetDTO = {
   ratio: number;
   period: "weekly" | "monthly" | "yearly";
   periodLabel: string;
+  updatedAt?: string;
+  syncStatus?: BudgetSyncStatus;
+  lastSyncError?: string;
 };

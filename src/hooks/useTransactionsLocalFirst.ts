@@ -11,12 +11,13 @@ import {
   getTransactionSyncOverview,
   listLocalTransactionsByYear,
   markTransactionSyncFailure,
-  mergeTransactionsFromServer,
+  mergeTransactionsFromServerMonth,
   queueLocalTransactionBulkCreate,
   queueLocalTransactionCreate,
   queueLocalTransactionDelete,
   queueLocalTransactionUpdate,
 } from "@/lib/offline/transactionsStore";
+import { writeTransactionsYearSnapshot } from "@/lib/offline/userSnapshots";
 
 type SyncState = {
   syncing: boolean;
@@ -29,7 +30,40 @@ const getErrorMessage = (error: unknown) =>
 
 const isOnline = () => typeof navigator === "undefined" || navigator.onLine;
 
-export function useTransactionsLocalFirst(userId: string | undefined, year: number) {
+const HYDRATION_TTL_MS = 60_000;
+
+const buildMonthKeysForYear = (year: number) =>
+  Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`);
+
+const orderMonthsForHydration = (year: number, anchorMonthKey: string) => {
+  const months = buildMonthKeysForYear(year);
+  const anchorIndex = Math.max(0, months.indexOf(anchorMonthKey));
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  for (let offset = 0; offset < months.length; offset += 1) {
+    const left = anchorIndex - offset;
+    const right = anchorIndex + offset;
+
+    if (left >= 0 && !seen.has(months[left]!)) {
+      ordered.push(months[left]!);
+      seen.add(months[left]!);
+    }
+
+    if (offset > 0 && right < months.length && !seen.has(months[right]!)) {
+      ordered.push(months[right]!);
+      seen.add(months[right]!);
+    }
+  }
+
+  return ordered;
+};
+
+export function useTransactionsLocalFirst(
+  userId: string | undefined,
+  year: number,
+  anchorMonthKey: string
+) {
   const [transactions, setTransactions] = useState<TransactionDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncState, setSyncState] = useState<SyncState>({
@@ -37,6 +71,14 @@ export function useTransactionsLocalFirst(userId: string | undefined, year: numb
     pendingCount: 0,
   });
   const syncingRef = useRef(false);
+  const hydratedMonthsRef = useRef<Map<string, number>>(new Map());
+  const inFlightMonthsRef = useRef<Set<string>>(new Set());
+  const backgroundHydrationTokenRef = useRef<string | null>(null);
+  const normalizedAnchorMonth = anchorMonthKey.startsWith(`${year}-`)
+    ? anchorMonthKey
+    : `${year}-01`;
+  const bootAnchorMonthRef = useRef(normalizedAnchorMonth);
+  bootAnchorMonthRef.current = normalizedAnchorMonth;
 
   const refreshSyncState = useCallback(async () => {
     if (!userId) {
@@ -64,26 +106,74 @@ export function useTransactionsLocalFirst(userId: string | undefined, year: numb
     setLoading(false);
   }, [userId, year]);
 
-  const fetchRemoteYear = useCallback(async () => {
-    const response = await fetch(`/api/transactions?year=${year}`, { cache: "no-store" });
+  const fetchRemoteMonth = useCallback(async (monthKey: string) => {
+    const response = await fetch(`/api/transactions?month=${monthKey}`, { cache: "no-store" });
     if (!response.ok) {
       throw new Error("Không thể tải giao dịch từ server.");
     }
 
     const data = (await response.json()) as { items?: TransactionDTO[] };
     return data.items ?? [];
-  }, [year]);
+  }, []);
+
+  const hydrateMonth = useCallback(async (monthKey: string, force = false) => {
+    if (!userId || !isOnline()) {
+      return;
+    }
+
+    const lastHydratedAt = hydratedMonthsRef.current.get(monthKey);
+    if (!force && lastHydratedAt && Date.now() - lastHydratedAt < HYDRATION_TTL_MS) {
+      return;
+    }
+
+    if (inFlightMonthsRef.current.has(monthKey)) {
+      return;
+    }
+
+    inFlightMonthsRef.current.add(monthKey);
+
+    try {
+      const remoteItems = await fetchRemoteMonth(monthKey);
+      const merged = await mergeTransactionsFromServerMonth(userId, year, monthKey, remoteItems);
+      hydratedMonthsRef.current.set(monthKey, Date.now());
+      setTransactions(merged);
+      await refreshSyncState();
+    } finally {
+      inFlightMonthsRef.current.delete(monthKey);
+    }
+  }, [fetchRemoteMonth, refreshSyncState, userId, year]);
+
+  const hydrateYearGradually = useCallback(async (startMonthKey: string, force = false) => {
+    if (!userId || !isOnline()) {
+      return;
+    }
+
+    const token = `${userId}:${year}`;
+    if (backgroundHydrationTokenRef.current === token) {
+      return;
+    }
+
+    backgroundHydrationTokenRef.current = token;
+
+    try {
+      for (const monthKey of orderMonthsForHydration(year, startMonthKey)) {
+        await hydrateMonth(monthKey, force);
+      }
+    } finally {
+      if (backgroundHydrationTokenRef.current === token) {
+        backgroundHydrationTokenRef.current = null;
+      }
+    }
+  }, [hydrateMonth, userId, year]);
 
   const refreshFromServer = useCallback(async () => {
     if (!userId || !isOnline()) {
       return;
     }
 
-    const remoteItems = await fetchRemoteYear();
-    const merged = await mergeTransactionsFromServer(userId, year, remoteItems);
-    setTransactions(merged);
-    await refreshSyncState();
-  }, [fetchRemoteYear, refreshSyncState, userId, year]);
+    await hydrateMonth(normalizedAnchorMonth, true);
+    void hydrateYearGradually(normalizedAnchorMonth);
+  }, [hydrateMonth, hydrateYearGradually, normalizedAnchorMonth, userId]);
 
   const syncPending = useCallback(async () => {
     if (!userId || !isOnline() || syncingRef.current) {
@@ -156,31 +246,58 @@ export function useTransactionsLocalFirst(userId: string | undefined, year: numb
       if (isOnline()) {
         await syncPending();
         if (!ignore) {
-          await refreshFromServer();
+          await hydrateMonth(bootAnchorMonthRef.current, true);
+          if (!ignore) {
+            void hydrateYearGradually(bootAnchorMonthRef.current);
+          }
         }
       }
     };
 
     void boot();
 
+    return () => {
+      ignore = true;
+    };
+  }, [
+    hydrateMonth,
+    hydrateYearGradually,
+    loadLocalYear,
+    refreshSyncState,
+    syncPending,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!userId || !isOnline()) {
+      return;
+    }
+
+    void hydrateMonth(normalizedAnchorMonth, true);
+    void hydrateYearGradually(normalizedAnchorMonth);
+  }, [hydrateMonth, hydrateYearGradually, normalizedAnchorMonth, userId]);
+
+  useEffect(() => {
     const handleOnline = () => {
-      void syncPending().then(() => refreshFromServer());
+      void syncPending().then(() => {
+        void hydrateMonth(normalizedAnchorMonth, true);
+        void hydrateYearGradually(normalizedAnchorMonth);
+      });
     };
 
     const intervalId = window.setInterval(() => {
-      if (!ignore && isOnline()) {
-        void syncPending().then(() => refreshFromServer());
+      if (isOnline()) {
+        void syncPending().then(() => hydrateMonth(normalizedAnchorMonth));
       }
     }, 15000);
 
     window.addEventListener("online", handleOnline);
 
     return () => {
-      ignore = true;
       window.clearInterval(intervalId);
       window.removeEventListener("online", handleOnline);
     };
-  }, [loadLocalYear, refreshFromServer, refreshSyncState, syncPending, userId]);
+  }, [hydrateMonth, hydrateYearGradually, normalizedAnchorMonth, syncPending]);
 
   const createTransaction = useCallback(
     async (payload: TransactionInput) => {
@@ -259,6 +376,14 @@ export function useTransactionsLocalFirst(userId: string | undefined, year: numb
     await syncPending();
     await refreshFromServer();
   }, [refreshFromServer, syncPending]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    void writeTransactionsYearSnapshot(userId, year, transactions);
+  }, [transactions, userId, year]);
 
   return {
     transactions,
