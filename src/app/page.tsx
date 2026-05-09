@@ -16,16 +16,18 @@ import { useTransactionsLocalFirst } from "@/hooks/useTransactionsLocalFirst";
 import { addMonths, monthKey, toYmd } from "@/lib/domain/date";
 import {
   readBillsSnapshot,
+  readBillPaymentsSnapshot,
   readBudgetAlertsSnapshot,
   readSettingsSnapshot,
   writeBillsSnapshot,
+  writeBillPaymentsSnapshot,
   writeBudgetAlertsSnapshot,
   writeSettingsSnapshot,
 } from "@/lib/offline/userSnapshots";
 import { payrollWindow } from "@/lib/domain/payroll";
 import { reserveInWindow } from "@/lib/domain/reserve";
 import type { TransactionInput } from "@/lib/domain/transactions";
-import type { BillDTO, BudgetAlertDTO, SettingsDTO, TransactionDTO } from "@/lib/types";
+import type { BillDTO, BillPaymentDTO, BudgetAlertDTO, SettingsDTO, TransactionDTO } from "@/lib/types";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN").format(value);
@@ -40,6 +42,7 @@ export default function HomePage() {
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [selectedDay, setSelectedDay] = useState(() => toYmd(new Date()));
   const [bills, setBills] = useState<BillDTO[]>([]);
+  const [billPayments, setBillPayments] = useState<BillPaymentDTO[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<BudgetAlertDTO[]>([]);
   const [settings, setSettings] = useState<SettingsDTO>({ paydayDay: 25, salaryExpected: 0 });
   const year = Number(month.slice(0, 4));
@@ -58,7 +61,10 @@ export default function HomePage() {
       throw new Error("Không thể tải khoản đóng.");
     }
     const data = await response.json();
-    return (data.items ?? []) as BillDTO[];
+    return {
+      items: (data.items ?? []) as BillDTO[],
+      payments: (data.payments ?? []) as BillPaymentDTO[],
+    };
   }, []);
 
   const fetchSettings = useCallback(async () => {
@@ -102,20 +108,23 @@ export default function HomePage() {
         if (!ignore) {
           setSettings({ paydayDay: 25, salaryExpected: 0 });
           setBills([]);
+          setBillPayments([]);
           setBudgetAlerts([]);
         }
         return;
       }
 
-      const [cachedSettings, cachedBills, cachedAlerts] = await Promise.all([
+      const [cachedSettings, cachedBills, cachedPayments, cachedAlerts] = await Promise.all([
         readSettingsSnapshot(user.id),
         readBillsSnapshot(user.id),
+        readBillPaymentsSnapshot(user.id),
         readBudgetAlertsSnapshot(user.id),
       ]);
 
       if (!ignore) {
         setSettings(cachedSettings);
         setBills(cachedBills);
+        setBillPayments(cachedPayments);
         setBudgetAlerts(cachedAlerts);
       }
 
@@ -134,8 +143,10 @@ export default function HomePage() {
         void writeSettingsSnapshot(user.id, settingsResult.value);
       }
       if (billsResult.status === "fulfilled") {
-        setBills(billsResult.value);
-        void writeBillsSnapshot(user.id, billsResult.value);
+        setBills(billsResult.value.items);
+        setBillPayments(billsResult.value.payments);
+        void writeBillsSnapshot(user.id, billsResult.value.items);
+        void writeBillPaymentsSnapshot(user.id, billsResult.value.payments);
       }
       if (alertsResult.status === "fulfilled") {
         setBudgetAlerts(alertsResult.value);
@@ -198,16 +209,27 @@ export default function HomePage() {
   const reserve = reserveInWindow(
     bills.map((bill) => ({
       id: bill.id,
+      clientId: bill.clientId,
+      serverId: bill.serverId,
       name: bill.name,
       amount: bill.amount,
       cycleType: bill.cycleType,
       cycleValue: bill.cycleValue,
       paid: bill.paid,
+      paidAt: bill.paidAt ? new Date(bill.paidAt) : null,
+      paidDueDates: billPayments
+        .filter(
+          (payment) =>
+            payment.templateClientId === (bill.clientId ?? bill.id) ||
+            payment.templateId === bill.serverId
+        )
+        .map((payment) => payment.dueDate),
       start: bill.start ? new Date(bill.start) : null,
       end: bill.end ? new Date(bill.end) : null,
       createdAt: bill.createdAt ? new Date(bill.createdAt) : null,
     })),
-    payroll
+    payroll,
+    new Date()
   );
 
   const payrollLabel = `${toYmd(payroll.lastPay)} → ${toYmd(payroll.nextPay)}`;
@@ -281,6 +303,7 @@ export default function HomePage() {
       <SummaryCards
         monthSummary={monthSummary}
         reserveTotal={reserve.total}
+        reservePlannedTotal={reserve.totalPlanned}
         salaryExpected={settings.salaryExpected}
         payrollLabel={payrollLabel}
       />
@@ -325,7 +348,13 @@ export default function HomePage() {
         </TabsContent>
 
         <TabsContent value="bills">
-          <BillsInWindow bills={reserve.items} reserveTotal={reserve.total} />
+          <BillsInWindow
+            bills={reserve.items}
+            reserveTotal={reserve.total}
+            plannedTotal={reserve.totalPlanned}
+            paidTotal={reserve.totalPaid}
+            payrollLabel={payrollLabel}
+          />
         </TabsContent>
       </Tabs>
 

@@ -67,6 +67,44 @@ billSchema.index(
   { unique: true, partialFilterExpression: { clientId: { $exists: true } } }
 );
 
+const billPaymentSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    templateId: { type: String, index: true },
+    templateClientId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    amount: { type: Number, required: true },
+    cycleType: {
+      type: String,
+      enum: ["monthly", "weekly", "custom_days"],
+      required: true,
+      default: "monthly",
+      index: true,
+    },
+    cycleValue: { type: Number, required: true, default: 1, index: true },
+    group: { type: String },
+    start: { type: Date },
+    end: { type: Date },
+    note: { type: String },
+    dueDate: { type: Date, required: true, index: true },
+    status: {
+      type: String,
+      enum: ["unpaid", "paid"],
+      required: true,
+      default: "unpaid",
+      index: true,
+    },
+    paidAt: { type: Date, index: true },
+    paidAmount: { type: Number },
+    paidNote: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { versionKey: false }
+);
+
+billPaymentSchema.index({ userId: 1, templateClientId: 1, dueDate: 1 }, { unique: true });
+
 const settingsSchema = new Schema(
   {
     userId: { type: String, required: true, unique: true, index: true },
@@ -142,6 +180,7 @@ const userSchema = new Schema(
 
 type Transaction = InferSchemaType<typeof transactionSchema>;
 type Bill = InferSchemaType<typeof billSchema>;
+type BillPayment = InferSchemaType<typeof billPaymentSchema>;
 type Settings = InferSchemaType<typeof settingsSchema>;
 type Category = InferSchemaType<typeof categorySchema>;
 type Budget = InferSchemaType<typeof budgetSchema>;
@@ -154,6 +193,9 @@ const TransactionModel: Model<Transaction> =
 
 const BillModel: Model<Bill> =
   mongoose.models.Bill || mongoose.model("Bill", billSchema);
+
+const BillPaymentModel: Model<BillPayment> =
+  mongoose.models.BillPayment || mongoose.model("BillPayment", billPaymentSchema);
 
 const SettingsModel: Model<Settings> =
   mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
@@ -173,10 +215,11 @@ const UserModel: Model<User> =
 export {
   TransactionModel,
   BillModel,
+  BillPaymentModel,
   SettingsModel,
   CategoryModel,
   BudgetModel,
   SyncOperationModel,
   UserModel,
 };
-export type { Transaction, Bill, Settings, Category, Budget, SyncOperation, User };
+export type { Transaction, Bill, BillPayment, Settings, Category, Budget, SyncOperation, User };

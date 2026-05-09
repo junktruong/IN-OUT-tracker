@@ -285,16 +285,9 @@ export function useTransactionsLocalFirst(
       });
     };
 
-    const intervalId = window.setInterval(() => {
-      if (isOnline()) {
-        void syncPending().then(() => hydrateMonth(normalizedAnchorMonth));
-      }
-    }, 15000);
-
     window.addEventListener("online", handleOnline);
 
     return () => {
-      window.clearInterval(intervalId);
       window.removeEventListener("online", handleOnline);
     };
   }, [hydrateMonth, hydrateYearGradually, normalizedAnchorMonth, syncPending]);

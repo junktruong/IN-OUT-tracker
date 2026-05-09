@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export type SummaryCardsProps = {
   monthSummary: { income: number; expense: number; net: number };
   reserveTotal: number;
+  reservePlannedTotal: number;
   salaryExpected: number;
   payrollLabel: string;
 };
@@ -17,10 +18,13 @@ const labelClass = "text-xs font-semibold uppercase tracking-wide text-caramel";
 export function SummaryCards({
   monthSummary,
   reserveTotal,
+  reservePlannedTotal,
   salaryExpected,
   payrollLabel,
 }: SummaryCardsProps) {
   const expectedBalance = salaryExpected - reserveTotal;
+  const reserveGap = reserveTotal - monthSummary.net;
+  const isReserveShort = reserveGap > 0;
 
   return (
     <Card className={cardClass}>
@@ -69,13 +73,31 @@ export function SummaryCards({
             <p className="mt-2 break-words text-xl font-semibold text-caramel sm:text-2xl">
               {formatCurrency(reserveTotal)}
             </p>
+            <p className="mt-1 text-[11px] text-caramel">
+              Tổng kỳ này: {formatCurrency(reservePlannedTotal)}
+            </p>
           </div>
         </div>
 
-        <p className="mt-4 text-xs font-medium text-caramel">
-          {expectedBalance >= 0 ? "Còn lại" : "Thiếu"} so với lương dự kiến:{" "}
-          <span className="text-mocha">{formatCurrency(Math.abs(expectedBalance))}</span>
-        </p>
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-medium text-caramel">
+            {expectedBalance >= 0 ? "Còn lại" : "Thiếu"} so với lương dự kiến:{" "}
+            <span className="text-mocha">{formatCurrency(Math.abs(expectedBalance))}</span>
+          </p>
+          {isReserveShort ? (
+            <div className="rounded-2xl border border-status-expense/40 bg-status-expense/15 px-3 py-3 text-sm text-mocha">
+              Cảnh báo: Ròng tháng đang thiếu{" "}
+              <span className="font-semibold">{formatCurrency(reserveGap)}</span> để đủ cho các
+              khoản chưa đóng trước kỳ lương kế tiếp.
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-status-income/30 bg-status-income/20 px-3 py-3 text-sm text-mocha">
+              Ròng tháng hiện vẫn dư{" "}
+              <span className="font-semibold">{formatCurrency(Math.abs(reserveGap))}</span> sau
+              khi giữ lại cho các khoản chưa đóng.
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

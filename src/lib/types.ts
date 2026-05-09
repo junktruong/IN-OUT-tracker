@@ -6,13 +6,6 @@ export type TransactionSyncStatus =
   | "sync_error";
 
 export type CategorySyncStatus = "synced" | "pending_create" | "sync_error";
-export type BillSyncStatus =
-  | "synced"
-  | "pending_upsert"
-  | "pending_delete"
-  | "pending_pay"
-  | "pending_unpay"
-  | "sync_error";
 export type BudgetSyncStatus = "synced" | "pending_upsert" | "sync_error";
 export type SettingsSyncStatus = "synced" | "pending_upsert" | "sync_error";
 
@@ -54,8 +47,27 @@ export type BillDTO = {
   paidNote?: string;
   createdAt?: string;
   updatedAt?: string;
-  syncStatus?: BillSyncStatus;
-  lastSyncError?: string;
+};
+
+export type BillPaymentDTO = {
+  id: string;
+  templateId?: string;
+  templateClientId: string;
+  name: string;
+  amount: number;
+  cycleType: "monthly" | "weekly" | "custom_days";
+  cycleValue: number;
+  group?: string;
+  start?: string;
+  end?: string;
+  note?: string;
+  dueDate: string;
+  status: "unpaid" | "paid";
+  paidAt?: string;
+  paidAmount?: number;
+  paidNote?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type SettingsDTO = {

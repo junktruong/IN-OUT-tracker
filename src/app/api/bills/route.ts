@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { billSchema } from "@/lib/domain/bills";
-import { listBills, upsertBill } from "@/lib/repo/billsRepo";
+import { toYmd } from "@/lib/domain/date";
+import { listBillPayments, listBills, upsertBill } from "@/lib/repo/billsRepo";
 import { getSessionUserFromRequest, unauthorizedResponse } from "@/lib/auth/session";
 
 type LegacyBill = {
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     return unauthorizedResponse();
   }
 
-  const items = await listBills(user.id);
+  const [items, payments] = await Promise.all([listBills(user.id), listBillPayments(user.id)]);
   const response = items.map((item) => {
     const legacy = item as LegacyBill;
     const cycleType = item.cycleType ?? "monthly";
@@ -28,19 +29,43 @@ export async function GET(request: Request) {
       cycleType,
       cycleValue,
       group: item.group,
-      start: item.start ? item.start.toISOString().slice(0, 10) : undefined,
-      end: item.end ? item.end.toISOString().slice(0, 10) : undefined,
+      start: item.start ? toYmd(item.start) : undefined,
+      end: item.end ? toYmd(item.end) : undefined,
       note: item.note,
       paid: item.paid,
-      paidAt: item.paidAt ? item.paidAt.toISOString().slice(0, 10) : undefined,
+      paidAt: item.paidAt ? toYmd(item.paidAt) : undefined,
       paidAmount: item.paidAmount ?? undefined,
       paidNote: item.paidNote ?? undefined,
       createdAt: item.createdAt ? item.createdAt.toISOString() : undefined,
       updatedAt: item.updatedAt ? item.updatedAt.toISOString() : undefined,
-      syncStatus: "synced" as const,
     };
   });
-  return NextResponse.json({ items: response });
+  const occurrenceItems = payments.map((payment) => ({
+    id: String(payment._id),
+    templateId: payment.templateId,
+    templateClientId: payment.templateClientId,
+    name: payment.name,
+    amount: payment.amount,
+    cycleType: payment.cycleType,
+    cycleValue: payment.cycleValue,
+    group: payment.group,
+    start: payment.start ? toYmd(payment.start) : undefined,
+    end: payment.end ? toYmd(payment.end) : undefined,
+    note: payment.note,
+    dueDate: toYmd(payment.dueDate),
+    status: payment.status === "paid" || payment.paidAt ? "paid" : "unpaid",
+    paidAt: payment.paidAt ? toYmd(payment.paidAt) : undefined,
+    paidAmount: payment.paidAmount ?? undefined,
+    paidNote: payment.paidNote ?? undefined,
+    createdAt: payment.createdAt ? payment.createdAt.toISOString() : undefined,
+    updatedAt: payment.updatedAt ? payment.updatedAt.toISOString() : undefined,
+  }));
+
+  return NextResponse.json({
+    items: response,
+    occurrences: occurrenceItems,
+    payments: occurrenceItems.filter((item) => item.status === "paid"),
+  });
 }
 
 export async function POST(request: Request) {

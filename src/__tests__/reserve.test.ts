@@ -22,10 +22,12 @@ describe("reserveInWindow", () => {
     );
 
     expect(result.total).toBe(5000000);
+    expect(result.totalPlanned).toBe(5000000);
     expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.status).toBe("unpaid");
   });
 
-  it("excludes paid bills", () => {
+  it("marks the matching occurrence as paid inside the payroll window", () => {
     const result = reserveInWindow(
       [
         {
@@ -35,12 +37,18 @@ describe("reserveInWindow", () => {
           cycleType: "monthly",
           cycleValue: 18,
           paid: true,
+          paidAt: new Date("2024-05-19T00:00:00"),
         },
       ],
       window
     );
 
     expect(result.total).toBe(0);
+    expect(result.totalPaid).toBe(300000);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.status).toBe("paid");
+    expect(result.items[0]?.paidAt).toBe("2024-05-19");
+    expect(result.items[0]?.nextDueDate).toBe("2024-06-18");
   });
 
   it("computes due date around payroll window", () => {
@@ -122,6 +130,7 @@ describe("reserveInWindow", () => {
       "2024-06-03",
     ]);
     expect(result.total).toBe(250000);
+    expect(result.totalPlanned).toBe(250000);
   });
 
   it("uses start date as the custom-days cycle anchor", () => {
@@ -142,5 +151,60 @@ describe("reserveInWindow", () => {
 
     expect(result.items.map((item) => item.dueDate)).toEqual(["2024-05-10", "2024-05-20", "2024-05-30"]);
     expect(result.total).toBe(360000);
+  });
+
+  it("counts only the remaining unpaid occurrences in reserve total", () => {
+    const result = reserveInWindow(
+      [
+        {
+          id: "1",
+          name: "Dọn nhà",
+          amount: 50000,
+          cycleType: "weekly",
+          cycleValue: 1,
+          paid: true,
+          paidAt: new Date("2024-05-14T00:00:00"),
+        },
+      ],
+      window
+    );
+
+    expect(result.items.map((item) => item.status)).toEqual([
+      "unpaid",
+      "paid",
+      "unpaid",
+      "unpaid",
+      "unpaid",
+    ]);
+    expect(result.totalPaid).toBe(50000);
+    expect(result.total).toBe(200000);
+    expect(result.totalPlanned).toBe(250000);
+  });
+
+  it("includes overdue monthly bills from previous months in reserve", () => {
+    const result = reserveInWindow(
+      [
+        {
+          id: "1",
+          clientId: "bill-overdue",
+          name: "Tra gop",
+          amount: 1000000,
+          cycleType: "monthly",
+          cycleValue: 15,
+          paid: false,
+          paidDueDates: ["2024-03-15"],
+          start: new Date("2024-03-01T00:00:00"),
+        },
+      ],
+      window,
+      new Date("2024-05-20T00:00:00")
+    );
+
+    expect(result.items.map((item) => item.dueDate)).toEqual([
+      "2024-04-15",
+      "2024-05-15",
+    ]);
+    expect(result.items.every((item) => item.status === "unpaid")).toBe(true);
+    expect(result.total).toBe(2000000);
   });
 });

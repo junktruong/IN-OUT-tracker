@@ -2,11 +2,17 @@ import { z } from "zod";
 
 export const billCycleTypes = ["monthly", "weekly", "custom_days"] as const;
 export type BillCycleType = (typeof billCycleTypes)[number];
+const ymdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const billPaySchema = z.object({
-  paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dueDate: ymdSchema,
+  paidAt: ymdSchema,
   paidAmount: z.number().positive().optional(),
   paidNote: z.string().optional(),
+});
+
+export const billUnpaySchema = z.object({
+  dueDate: ymdSchema,
 });
 
 export const billSchema = z
@@ -49,50 +55,4 @@ export const billSchema = z
 
 export type BillInput = z.infer<typeof billSchema>;
 export type BillPayInput = z.infer<typeof billPaySchema>;
-
-export const billSyncOperationSchema = z
-  .object({
-    operationId: z.string().min(1).optional(),
-    clientMutationId: z.string().min(1).optional(),
-    type: z.enum(["upsert", "delete", "pay", "unpay"]),
-    clientId: z.string().min(1),
-    serverId: z.string().optional(),
-    payload: z.union([billSchema, billPaySchema]).optional(),
-  })
-  .superRefine((value, context) => {
-    if (!value.operationId && !value.clientMutationId) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "operationId hoặc clientMutationId là bắt buộc.",
-        path: ["operationId"],
-      });
-    }
-
-    if (value.type === "upsert") {
-      const parsed = billSchema.safeParse(value.payload);
-      if (!parsed.success) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "payload upsert không hợp lệ.",
-          path: ["payload"],
-        });
-      }
-    }
-
-    if (value.type === "pay") {
-      const parsed = billPaySchema.safeParse(value.payload);
-      if (!parsed.success) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "payload pay không hợp lệ.",
-          path: ["payload"],
-        });
-      }
-    }
-  });
-
-export const billSyncBatchSchema = z.object({
-  operations: z.array(billSyncOperationSchema).min(1).max(100),
-});
-
-export type BillSyncOperationInput = z.infer<typeof billSyncOperationSchema>;
+export type BillUnpayInput = z.infer<typeof billUnpaySchema>;

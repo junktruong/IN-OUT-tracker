@@ -170,17 +170,10 @@ export function useCategories(active = true) {
       void syncPending().then(() => refreshFromServer());
     };
 
-    const intervalId = window.setInterval(() => {
-      if (!ignore && isOnline()) {
-        void syncPending().then(() => refreshFromServer());
-      }
-    }, 15000);
-
     window.addEventListener("online", handleOnline);
 
     return () => {
       ignore = true;
-      window.clearInterval(intervalId);
       window.removeEventListener("online", handleOnline);
     };
   }, [active, loadLocalCategories, refreshFromServer, refreshSyncState, syncPending, userId]);

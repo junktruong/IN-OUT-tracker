@@ -178,17 +178,10 @@ export function useSettingsLocalFirst() {
       void syncPending();
     };
 
-    const intervalId = window.setInterval(() => {
-      if (!ignore && isOnline()) {
-        void syncPending();
-      }
-    }, 15000);
-
     window.addEventListener("online", handleOnline);
 
     return () => {
       ignore = true;
-      window.clearInterval(intervalId);
       window.removeEventListener("online", handleOnline);
     };
   }, [fetchRemote, loadLocal, refreshSyncState, syncPending, userId]);

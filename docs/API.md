@@ -402,6 +402,8 @@ Lay danh sach khoan dong cua user hien tai.
   "items": [
     {
       "id": "bill_id",
+      "clientId": "bill_client_id",
+      "serverId": "bill_server_id",
       "name": "Tien nha",
       "amount": 5000000,
       "cycleType": "monthly",
@@ -411,10 +413,50 @@ Lay danh sach khoan dong cua user hien tai.
       "end": "2026-12-31",
       "note": "Dong dau thang",
       "paid": false,
-      "paidAt": "2026-04-05",
-      "paidAmount": 5000000,
-      "paidNote": "Da dong",
       "createdAt": "2026-04-01T02:00:00.000Z"
+    }
+  ],
+  "occurrences": [
+    {
+      "id": "bill_occurrence_id",
+      "templateId": "bill_server_id",
+      "templateClientId": "bill_client_id",
+      "name": "Tien nha",
+      "amount": 5000000,
+      "cycleType": "monthly",
+      "cycleValue": 5,
+      "dueDate": "2026-04-05",
+      "status": "paid",
+      "paidAt": "2026-04-03",
+      "paidAmount": 5000000,
+      "paidNote": "Da dong"
+    },
+    {
+      "id": "bill_occurrence_id_2",
+      "templateId": "bill_server_id",
+      "templateClientId": "bill_client_id",
+      "name": "Tien nha",
+      "amount": 5000000,
+      "cycleType": "monthly",
+      "cycleValue": 5,
+      "dueDate": "2026-05-05",
+      "status": "unpaid"
+    }
+  ],
+  "payments": [
+    {
+      "id": "bill_payment_id",
+      "templateId": "bill_server_id",
+      "templateClientId": "bill_client_id",
+      "name": "Tien nha",
+      "amount": 5000000,
+      "cycleType": "monthly",
+      "cycleValue": 5,
+      "dueDate": "2026-04-05",
+      "status": "paid",
+      "paidAt": "2026-04-03",
+      "paidAmount": 5000000,
+      "paidNote": "Da dong"
     }
   ]
 }
@@ -425,6 +467,9 @@ Lay danh sach khoan dong cua user hien tai.
 - Neu document cu chi co `dueDay`, API se tu map thanh:
   - `cycleType = "monthly"`
   - `cycleValue = dueDay`
+- `items` la template khoan dong lap lai.
+- `occurrences` la tung ky dong cu the, moi ky co `status = "unpaid" | "paid"`.
+- `payments` chi la subset da dong cua `occurrences`, giu lai de tuong thich voi dashboard va code cu.
 
 #### Loi
 
@@ -531,12 +576,13 @@ Toggle nhanh trang thai da dong / chua dong.
 
 ### PATCH `/api/bills/:id/pay`
 
-Xac nhan da dong kem ngay / so tien / ghi chu.
+Xac nhan da dong cho 1 ky cu the. Route nay se tao record lich su da dong, khong mutate template recurring goc.
 
 #### Body
 
 ```json
 {
+  "dueDate": "2026-04-05",
   "paidAt": "2026-04-05",
   "paidAmount": 5000000,
   "paidNote": "Da dong"
@@ -546,7 +592,7 @@ Xac nhan da dong kem ngay / so tien / ghi chu.
 #### Success
 
 ```json
-{ "id": "bill_id" }
+{ "id": "bill_payment_id", "dueDate": "2026-04-05" }
 ```
 
 #### Loi
@@ -561,12 +607,20 @@ Xac nhan da dong kem ngay / so tien / ghi chu.
 
 ### PATCH `/api/bills/:id/unpay`
 
-Bo danh dau da dong.
+Bo 1 record da dong theo `dueDate`.
+
+#### Body
+
+```json
+{
+  "dueDate": "2026-04-05"
+}
+```
 
 #### Success
 
 ```json
-{ "id": "bill_id" }
+{ "id": "bill_payment_id", "dueDate": "2026-04-05" }
 ```
 
 #### Loi
@@ -574,90 +628,10 @@ Bo danh dau da dong.
 | HTTP | Body |
 | --- | --- |
 | `401` | `{ "error": "Vui long dang nhap bang Google." }` |
+| `400` | `{ "error": "Du lieu khong hop le." }` |
 | `404` | `{ "error": "Khong tim thay khoan dong." }` |
 
 ---
-
-### POST `/api/sync/bills`
-
-Dong bo batch khoan dong tu local queue len server. Route nay duoc dung cho local-first flow cua bills, co idempotency bang `operationId` hoac `clientMutationId`.
-
-#### Auth
-
-- Bat buoc dang nhap
-
-#### Body
-
-```json
-{
-  "operations": [
-    {
-      "operationId": "op_bill_1",
-      "type": "upsert",
-      "clientId": "local_bill_1",
-      "payload": {
-        "name": "Tien dien",
-        "amount": 450000,
-        "cycleType": "monthly",
-        "cycleValue": 12
-      }
-    },
-    {
-      "operationId": "op_bill_2",
-      "type": "pay",
-      "clientId": "local_bill_1",
-      "serverId": "bill_id_optional",
-      "payload": {
-        "paidAt": "2026-05-07",
-        "paidAmount": 450000
-      }
-    },
-    {
-      "operationId": "op_bill_3",
-      "type": "delete",
-      "clientId": "local_bill_1",
-      "serverId": "bill_id_optional"
-    }
-  ]
-}
-```
-
-#### Rule
-
-- `type` ho tro: `upsert`, `delete`, `pay`, `unpay`
-- `upsert` bat buoc co `payload` theo schema bill
-- `pay` bat buoc co `payload` theo schema payment
-- `operationId` hoac `clientMutationId` bat buoc co it nhat 1 field
-- `clientId` la dinh danh on dinh do client sinh ra de noi local bill voi server bill
-
-#### Success
-
-```json
-{
-  "results": [
-    {
-      "operationId": "op_bill_1",
-      "clientId": "local_bill_1",
-      "serverId": "bill_id",
-      "status": "applied"
-    }
-  ]
-}
-```
-
-#### `status` meaning
-
-- `applied`: Server vua xu ly thay doi
-- `duplicate`: `operationId` da duoc xu ly truoc do hoac record da o trang thai tuong ung
-- `deleted`: Bill da bi xoa tren server
-
-#### Loi
-
-| HTTP | Body | Khi nao xay ra |
-| --- | --- | --- |
-| `401` | `{ "error": "Vui long dang nhap bang Google." }` | Chua dang nhap |
-| `400` | `{ "error": "Du lieu sync khong hop le." }` | Thieu `operationId/clientMutationId`, `clientId`, hoac `payload` sai schema |
-| `500` | `{ "error": "Khong the dong bo khoan dong." }` | Loi DB / loi xu ly sync |
 
 ## Categories APIs
 

@@ -1,39 +1,34 @@
 "use client";
 
 import { readUserJsonDocument, writeUserJsonDocument } from "@/lib/offline/opfsJson";
-import type { BillDTO, BudgetAlertDTO, BudgetDTO, CategoryDTO, SettingsDTO, TransactionDTO } from "@/lib/types";
+import type {
+  BillDTO,
+  BillPaymentDTO,
+  BudgetAlertDTO,
+  BudgetDTO,
+  CategoryDTO,
+  SettingsDTO,
+  TransactionDTO,
+} from "@/lib/types";
 import type { BudgetPeriod } from "@/lib/domain/budgets";
-import type { BillInput, BillPayInput } from "@/lib/domain/bills";
 import type { BudgetInput } from "@/lib/domain/budgets";
 import type { SettingsInput } from "@/lib/domain/settings";
 
 const settingsPath = ["settings.json"];
 const billsPath = ["bills.json"];
+const billPaymentsPath = ["bill-payments.json"];
 const categoriesPath = ["categories.json"];
 const budgetAlertsPath = ["budget-alerts.json"];
 
 const budgetPeriodPath = (period: BudgetPeriod) => ["budgets", `${period}.json`];
 const transactionsYearPath = (year: number) => ["transactions", `${year}.json`];
 const settingsQueuePath = ["sync-jobs", "settings.json"];
-const billsQueuePath = ["sync-jobs", "bills.json"];
 const budgetsQueuePath = ["sync-jobs", "budgets.json"];
 
 export type SettingsSyncJob = {
   operationId: string;
   mutationType: "upsert";
   payload: SettingsInput;
-  attempts: number;
-  createdAt: string;
-  updatedAt: string;
-  lastError?: string;
-};
-
-export type BillSyncJob = {
-  operationId: string;
-  clientId: string;
-  serverId?: string;
-  mutationType: "upsert" | "delete" | "pay" | "unpay";
-  payload?: BillInput | BillPayInput;
   attempts: number;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +46,29 @@ export type BudgetSyncJob = {
   lastError?: string;
 };
 
+const normalizeBillPaymentsSnapshot = (value: unknown): BillPaymentDTO[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as {
+      occurrences?: unknown;
+      payments?: unknown;
+    };
+
+    if (Array.isArray(record.occurrences)) {
+      return record.occurrences;
+    }
+
+    if (Array.isArray(record.payments)) {
+      return record.payments;
+    }
+  }
+
+  return [];
+};
+
 export const readSettingsSnapshot = (userId: string) =>
   readUserJsonDocument<SettingsDTO>(userId, settingsPath, {
     paydayDay: 25,
@@ -65,6 +83,14 @@ export const readBillsSnapshot = (userId: string) =>
 
 export const writeBillsSnapshot = (userId: string, bills: BillDTO[]) =>
   writeUserJsonDocument(userId, billsPath, bills);
+
+export const readBillPaymentsSnapshot = async (userId: string) =>
+  normalizeBillPaymentsSnapshot(
+    await readUserJsonDocument<unknown>(userId, billPaymentsPath, [])
+  );
+
+export const writeBillPaymentsSnapshot = (userId: string, payments: BillPaymentDTO[]) =>
+  writeUserJsonDocument(userId, billPaymentsPath, payments);
 
 export const readCategoriesSnapshot = (userId: string) =>
   readUserJsonDocument<CategoryDTO[]>(userId, categoriesPath, []);
@@ -101,12 +127,6 @@ export const readSettingsSyncQueue = (userId: string) =>
 
 export const writeSettingsSyncQueue = (userId: string, jobs: SettingsSyncJob[]) =>
   writeUserJsonDocument(userId, settingsQueuePath, jobs);
-
-export const readBillsSyncQueue = (userId: string) =>
-  readUserJsonDocument<BillSyncJob[]>(userId, billsQueuePath, []);
-
-export const writeBillsSyncQueue = (userId: string, jobs: BillSyncJob[]) =>
-  writeUserJsonDocument(userId, billsQueuePath, jobs);
 
 export const readBudgetsSyncQueue = (userId: string) =>
   readUserJsonDocument<BudgetSyncJob[]>(userId, budgetsQueuePath, []);

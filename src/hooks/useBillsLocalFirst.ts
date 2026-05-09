@@ -1,161 +1,143 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { BillInput, BillPayInput } from "@/lib/domain/bills";
-import type { BillDTO } from "@/lib/types";
+import type { BillDTO, BillPaymentDTO } from "@/lib/types";
 import {
+  readBillPaymentsSnapshot,
   readBillsSnapshot,
-  readBillsSyncQueue,
+  writeBillPaymentsSnapshot,
   writeBillsSnapshot,
-  writeBillsSyncQueue,
-  type BillSyncJob,
 } from "@/lib/offline/userSnapshots";
 
-type SyncState = {
+type RequestState = {
   syncing: boolean;
   pendingCount: number;
   lastError?: string;
 };
 
+type RemoteBillsPayload = {
+  items: BillDTO[];
+  occurrences: BillPaymentDTO[];
+};
+
+const normalizeBills = (value: unknown): BillDTO[] => (Array.isArray(value) ? value : []);
+
+const withOccurrenceStatus = (occurrence: BillPaymentDTO): BillPaymentDTO => ({
+  ...occurrence,
+  status: occurrence.status === "paid" || occurrence.paidAt ? "paid" : "unpaid",
+});
+
+const normalizeOccurrences = (value: unknown): BillPaymentDTO[] => {
+  if (Array.isArray(value)) {
+    return value.map(withOccurrenceStatus);
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as {
+      occurrences?: unknown;
+      payments?: unknown;
+    };
+
+    if (Array.isArray(record.occurrences)) {
+      return record.occurrences.map(withOccurrenceStatus);
+    }
+
+    if (Array.isArray(record.payments)) {
+      return record.payments.map(withOccurrenceStatus);
+    }
+  }
+
+  return [];
+};
+
 const isOnline = () => typeof navigator === "undefined" || navigator.onLine;
 
-const createId = () =>
-  globalThis.crypto?.randomUUID?.() ??
-  `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const getBillRequestId = (bill: Pick<BillDTO, "id" | "clientId" | "serverId">) =>
+  bill.serverId ?? bill.clientId ?? bill.id;
 
-const getBillKey = (bill: Pick<BillDTO, "id" | "clientId" | "serverId">) =>
-  bill.clientId ?? bill.serverId ?? bill.id;
-
-const isSameBill = (bill: Pick<BillDTO, "id" | "clientId" | "serverId">, key: string) =>
-  bill.id === key || bill.clientId === key || bill.serverId === key;
-
-const markFailedBills = (items: BillDTO[], jobs: BillSyncJob[], message: string) => {
-  const failedKeys = new Set(jobs.map((job) => job.clientId));
-  return items.map((item) =>
-    failedKeys.has(getBillKey(item))
-      ? {
-          ...item,
-          syncStatus: "sync_error" as const,
-          lastSyncError: message,
-        }
-      : item
-  );
-};
+const getOccurrenceTemplateRequestId = (
+  occurrence: Pick<BillPaymentDTO, "templateId" | "templateClientId">
+) => occurrence.templateId ?? occurrence.templateClientId;
 
 export function useBillsLocalFirst() {
   const { user } = useAuth();
   const userId = user?.id;
   const [items, setItems] = useState<BillDTO[]>([]);
+  const [occurrences, setOccurrences] = useState<BillPaymentDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncState, setSyncState] = useState<SyncState>({
+  const [requestState, setRequestState] = useState<RequestState>({
     syncing: false,
     pendingCount: 0,
   });
-  const syncingRef = useRef(false);
 
-  const refreshSyncState = useCallback(async () => {
-    if (!userId) {
-      setSyncState({ syncing: false, pendingCount: 0 });
-      return;
-    }
+  const writeLocal = useCallback(
+    async (nextItems: BillDTO[], nextOccurrences: BillPaymentDTO[]) => {
+      if (!userId) {
+        return;
+      }
 
-    const jobs = await readBillsSyncQueue(userId);
-    setSyncState((current) => ({
-      ...current,
-      pendingCount: jobs.length,
-      lastError: [...jobs].reverse().find((item) => item.lastError)?.lastError,
-    }));
-  }, [userId]);
+      await writeBillsSnapshot(userId, nextItems);
+      await writeBillPaymentsSnapshot(userId, nextOccurrences);
+    },
+    [userId]
+  );
 
-  const fetchRemote = useCallback(async () => {
+  const fetchRemote = useCallback(async (): Promise<RemoteBillsPayload> => {
     const response = await fetch("/api/bills", { cache: "no-store" });
     if (!response.ok) {
       throw new Error("Không thể tải khoản đóng.");
     }
 
-    const data = (await response.json()) as { items?: BillDTO[] };
-    return (data.items ?? []).map((item) => ({
-      ...item,
-      syncStatus: "synced" as const,
-      lastSyncError: undefined,
-    }));
+    const data = (await response.json()) as {
+      items?: BillDTO[];
+      occurrences?: BillPaymentDTO[];
+      payments?: BillPaymentDTO[];
+    };
+
+    return {
+      items: normalizeBills(data.items),
+      occurrences: normalizeOccurrences(data.occurrences ?? data.payments),
+    };
   }, []);
+
+  const refreshRemote = useCallback(async () => {
+    if (!userId || !isOnline()) {
+      return;
+    }
+
+    setRequestState({ syncing: true, pendingCount: 0 });
+    try {
+      const remote = await fetchRemote();
+      await writeLocal(remote.items, remote.occurrences);
+      setItems(remote.items);
+      setOccurrences(remote.occurrences);
+      setRequestState({ syncing: false, pendingCount: 0 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể cập nhật khoản đóng.";
+      setRequestState({ syncing: false, pendingCount: 0, lastError: message });
+    }
+  }, [fetchRemote, userId, writeLocal]);
 
   const loadLocal = useCallback(async () => {
     if (!userId) {
       setItems([]);
+      setOccurrences([]);
       setLoading(false);
       return;
     }
 
-    const snapshot = await readBillsSnapshot(userId);
-    setItems(snapshot);
+    const [templatesSnapshot, occurrencesSnapshot] = await Promise.all([
+      readBillsSnapshot(userId),
+      readBillPaymentsSnapshot(userId),
+    ]);
+
+    setItems(normalizeBills(templatesSnapshot));
+    setOccurrences(normalizeOccurrences(occurrencesSnapshot));
     setLoading(false);
   }, [userId]);
-
-  const syncPending = useCallback(async () => {
-    if (!userId || !isOnline() || syncingRef.current) {
-      return;
-    }
-
-    const jobs = await readBillsSyncQueue(userId);
-    if (jobs.length === 0) {
-      await refreshSyncState();
-      return;
-    }
-
-    syncingRef.current = true;
-    setSyncState((current) => ({ ...current, syncing: true }));
-
-    try {
-      const response = await fetch("/api/sync/bills", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operations: [...jobs]
-            .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-            .map((job) => ({
-              operationId: job.operationId,
-              type: job.mutationType,
-              clientId: job.clientId,
-              serverId: job.serverId,
-              payload: job.payload,
-            })),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Server chưa nhận được sync khoản đóng.");
-      }
-
-      await writeBillsSyncQueue(userId, []);
-      const remote = await fetchRemote();
-      await writeBillsSnapshot(userId, remote);
-      setItems(remote);
-      await refreshSyncState();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Không thể đồng bộ khoản đóng.";
-      const failedAt = new Date().toISOString();
-      const nextJobs = jobs.map((job) => ({
-        ...job,
-        attempts: job.attempts + 1,
-        updatedAt: failedAt,
-        lastError: message,
-      }));
-      await writeBillsSyncQueue(userId, nextJobs);
-
-      const snapshot = await readBillsSnapshot(userId);
-      const nextItems = markFailedBills(snapshot, jobs, message);
-      await writeBillsSnapshot(userId, nextItems);
-      setItems(nextItems);
-      await refreshSyncState();
-    } finally {
-      syncingRef.current = false;
-      setSyncState((current) => ({ ...current, syncing: false }));
-    }
-  }, [fetchRemote, refreshSyncState, userId]);
 
   useEffect(() => {
     let ignore = false;
@@ -163,115 +145,50 @@ export function useBillsLocalFirst() {
     const boot = async () => {
       setLoading(true);
       await loadLocal();
-      await refreshSyncState();
-
-      if (ignore || !userId) {
-        return;
-      }
-
-      if (isOnline()) {
-        await syncPending();
-        if (!ignore) {
-          try {
-            const remote = await fetchRemote();
-            await writeBillsSnapshot(userId, remote);
-            setItems(remote);
-          } catch {
-            // Keep local snapshot while offline.
-          }
-        }
+      if (!ignore) {
+        await refreshRemote();
       }
     };
 
     void boot();
 
     const handleOnline = () => {
-      void syncPending();
+      void refreshRemote();
     };
-
-    const intervalId = window.setInterval(() => {
-      if (!ignore && isOnline()) {
-        void syncPending();
-      }
-    }, 15000);
 
     window.addEventListener("online", handleOnline);
 
     return () => {
       ignore = true;
-      window.clearInterval(intervalId);
       window.removeEventListener("online", handleOnline);
     };
-  }, [fetchRemote, loadLocal, refreshSyncState, syncPending, userId]);
+  }, [loadLocal, refreshRemote]);
 
   const saveBill = useCallback(
     async (payload: BillInput, billId?: string) => {
       if (!userId) {
         throw new Error("Không có thông tin đăng nhập cục bộ.");
       }
+      if (!isOnline()) {
+        throw new Error("Cần có mạng để lưu khoản đóng.");
+      }
 
-      const existing = billId
-        ? items.find((item) => isSameBill(item, billId))
-        : undefined;
-      const clientId = existing?.clientId ?? existing?.id ?? createId();
-      const serverId = existing?.serverId;
-      const now = new Date().toISOString();
+      const response = await fetch("/api/bills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          id: billId ?? payload.id,
+        }),
+      });
 
-      const nextItem: BillDTO = {
-        id: clientId,
-        clientId,
-        serverId,
-        name: payload.name,
-        amount: payload.amount,
-        cycleType: payload.cycleType,
-        cycleValue: payload.cycleValue,
-        group: payload.group,
-        start: payload.start,
-        end: payload.end,
-        note: payload.note,
-        paid: existing?.paid ?? false,
-        paidAt: existing?.paidAt,
-        paidAmount: existing?.paidAmount,
-        paidNote: existing?.paidNote,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        syncStatus: "pending_upsert",
-        lastSyncError: undefined,
-      };
+      if (!response.ok) {
+        throw new Error("Không thể lưu khoản đóng.");
+      }
 
-      const nextItems = [
-        ...items.filter((item) => !isSameBill(item, clientId)),
-        nextItem,
-      ];
-
-      const queue = await readBillsSyncQueue(userId);
-      const nextJobs: BillSyncJob[] = [
-        ...queue.filter(
-          (job) =>
-            !(
-              job.clientId === clientId &&
-              (job.mutationType === "upsert" || job.mutationType === "delete")
-            )
-        ),
-        {
-          operationId: createId(),
-          clientId,
-          serverId,
-          mutationType: "upsert",
-          payload,
-          attempts: 0,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ];
-
-      await writeBillsSnapshot(userId, nextItems);
-      await writeBillsSyncQueue(userId, nextJobs);
-      setItems(nextItems);
-      await refreshSyncState();
-      void syncPending();
+      await refreshRemote();
     },
-    [items, refreshSyncState, syncPending, userId]
+    [refreshRemote, userId]
   );
 
   const removeBill = useCallback(
@@ -279,35 +196,21 @@ export function useBillsLocalFirst() {
       if (!userId) {
         throw new Error("Không có thông tin đăng nhập cục bộ.");
       }
+      if (!isOnline()) {
+        throw new Error("Cần có mạng để xoá khoản đóng.");
+      }
 
-      const clientId = bill.clientId ?? bill.id;
-      const now = new Date().toISOString();
-      const queue = await readBillsSyncQueue(userId);
-      const hasServerRecord = Boolean(bill.serverId);
+      const response = await fetch(`/api/bills/${encodeURIComponent(getBillRequestId(bill))}`, {
+        method: "DELETE",
+      });
 
-      const nextJobs = hasServerRecord
-        ? [
-            ...queue.filter((job) => job.clientId !== clientId),
-            {
-              operationId: createId(),
-              clientId,
-              serverId: bill.serverId,
-              mutationType: "delete" as const,
-              attempts: 0,
-              createdAt: now,
-              updatedAt: now,
-            },
-          ]
-        : queue.filter((job) => job.clientId !== clientId);
+      if (!response.ok) {
+        throw new Error("Không thể xoá khoản đóng.");
+      }
 
-      const nextItems = items.filter((item) => !isSameBill(item, clientId));
-      await writeBillsSnapshot(userId, nextItems);
-      await writeBillsSyncQueue(userId, nextJobs);
-      setItems(nextItems);
-      await refreshSyncState();
-      void syncPending();
+      await refreshRemote();
     },
-    [items, refreshSyncState, syncPending, userId]
+    [refreshRemote, userId]
   );
 
   const confirmBillPaid = useCallback(
@@ -315,104 +218,60 @@ export function useBillsLocalFirst() {
       if (!userId) {
         throw new Error("Không có thông tin đăng nhập cục bộ.");
       }
+      if (!isOnline()) {
+        throw new Error("Cần có mạng để xác nhận khoản đóng.");
+      }
 
-      const clientId = bill.clientId ?? bill.id;
-      const now = new Date().toISOString();
-      const nextItems = items.map((item) =>
-        isSameBill(item, clientId)
-          ? {
-              ...item,
-              paid: true,
-              paidAt: payload.paidAt,
-              paidAmount: payload.paidAmount,
-              paidNote: payload.paidNote,
-              updatedAt: now,
-              syncStatus: "pending_pay" as const,
-              lastSyncError: undefined,
-            }
-          : item
+      const response = await fetch(
+        `/api/bills/${encodeURIComponent(getBillRequestId(bill))}/pay`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
       );
 
-      const queue = await readBillsSyncQueue(userId);
-      const nextJobs: BillSyncJob[] = [
-        ...queue.filter(
-          (job) =>
-            !(job.clientId === clientId && (job.mutationType === "pay" || job.mutationType === "unpay"))
-        ),
-        {
-          operationId: createId(),
-          clientId,
-          serverId: bill.serverId,
-          mutationType: "pay",
-          payload,
-          attempts: 0,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ];
+      if (!response.ok) {
+        throw new Error("Không thể xác nhận đã đóng.");
+      }
 
-      await writeBillsSnapshot(userId, nextItems);
-      await writeBillsSyncQueue(userId, nextJobs);
-      setItems(nextItems);
-      await refreshSyncState();
-      void syncPending();
+      await refreshRemote();
     },
-    [items, refreshSyncState, syncPending, userId]
+    [refreshRemote, userId]
   );
 
   const undoBillPaid = useCallback(
-    async (bill: BillDTO) => {
+    async (occurrence: BillPaymentDTO) => {
       if (!userId) {
         throw new Error("Không có thông tin đăng nhập cục bộ.");
       }
+      if (!isOnline()) {
+        throw new Error("Cần có mạng để hoàn tác khoản đóng.");
+      }
 
-      const clientId = bill.clientId ?? bill.id;
-      const now = new Date().toISOString();
-      const nextItems = items.map((item) =>
-        isSameBill(item, clientId)
-          ? {
-              ...item,
-              paid: false,
-              paidAt: undefined,
-              paidAmount: undefined,
-              paidNote: undefined,
-              updatedAt: now,
-              syncStatus: "pending_unpay" as const,
-              lastSyncError: undefined,
-            }
-          : item
+      const response = await fetch(
+        `/api/bills/${encodeURIComponent(getOccurrenceTemplateRequestId(occurrence))}/unpay`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dueDate: occurrence.dueDate }),
+        }
       );
 
-      const queue = await readBillsSyncQueue(userId);
-      const nextJobs: BillSyncJob[] = [
-        ...queue.filter(
-          (job) =>
-            !(job.clientId === clientId && (job.mutationType === "pay" || job.mutationType === "unpay"))
-        ),
-        {
-          operationId: createId(),
-          clientId,
-          serverId: bill.serverId,
-          mutationType: "unpay",
-          attempts: 0,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ];
+      if (!response.ok) {
+        throw new Error("Không thể hoàn tác khoản đã đóng.");
+      }
 
-      await writeBillsSnapshot(userId, nextItems);
-      await writeBillsSyncQueue(userId, nextJobs);
-      setItems(nextItems);
-      await refreshSyncState();
-      void syncPending();
+      await refreshRemote();
     },
-    [items, refreshSyncState, syncPending, userId]
+    [refreshRemote, userId]
   );
 
   return {
     items,
+    occurrences,
     loading,
-    syncState,
+    requestState,
     saveBill,
     removeBill,
     confirmBillPaid,
